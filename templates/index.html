@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#173d31">
+  <meta name="description" content="RollCall is a live college attendance portal for students and teachers. See your percentage, know how many periods you can skip, and mark roll call in seconds.">
+  <title>RollCall — Live college attendance</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/landing.css">
+</head>
+<body class="landing">
+  <div class="site-wrap">
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="RollCall home">
+        <span class="brand__mark" aria-hidden="true">
+          <svg viewBox="0 0 28 28" fill="none"><path d="M7 14.5l4.3 4.2L21 8.8" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="brand__name">RollCall<span class="brand__dot">.</span></span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="#portals">Portals</a>
+        <a href="#how-it-works">How it works</a>
+        <a class="site-nav__login" href="/student/login">Student login</a>
+        <a class="btn btn--small btn--dark" href="/teacher/login">Teacher login</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero__copy">
+          <p class="eyebrow eyebrow--live"><span class="live-dot"></span> Attendance, live and in one place</p>
+          <h1>Know exactly<br>where <em>you stand.</em></h1>
+          <p class="hero__lede">No more counting periods on your fingers. RollCall shows your real attendance, tells you how many classes you can safely miss, and helps teachers finish roll call before the room settles.</p>
+          <div class="hero__actions">
+            <a class="btn btn--dark btn--large" href="/student/login">
+              Open student portal
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10h12m-5-5l5 5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </a>
+            <a class="btn btn--ghost btn--large" href="/teacher/login">I'm a teacher</a>
+          </div>
+          <div class="hero__note">
+            <div class="avatar-stack" aria-hidden="true">
+              <span class="mini-avatar mini-avatar--1">AR</span>
+              <span class="mini-avatar mini-avatar--2">AD</span>
+              <span class="mini-avatar mini-avatar--3">BU</span>
+            </div>
+            <p><strong>GVP IHLR · MCA 1st Semester.</strong><br><span>One campus. Two simple doors.</span></p>
+          </div>
+        </div>
+
+        <div class="hero__visual" aria-label="Preview of the RollCall dashboard">
+          <div class="preview-orbit preview-orbit--one" aria-hidden="true"></div>
+          <div class="preview-orbit preview-orbit--two" aria-hidden="true"></div>
+          <div class="preview-card">
+            <div class="preview-card__top">
+              <div>
+                <span class="preview-kicker">MY ATTENDANCE</span>
+                <p class="preview-name">MCA 1st Semester <span>•</span> MCA-1</p>
+              </div>
+              <span class="live-pill"><span></span> Live</span>
+            </div>
+            <div class="preview-main">
+              <div class="ring ring--preview" style="--value:82">
+                <div class="ring__inner">
+                  <strong>82<span>%</span></strong>
+                  <span>this semester</span>
+                </div>
+              </div>
+              <div class="preview-status">
+                <span class="status-pill status-pill--safe">On track</span>
+                <h2>You've got room to breathe.</h2>
+                <p>82 of 100 periods attended</p>
+              </div>
+            </div>
+            <div class="preview-insight">
+              <div class="preview-insight__icon">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-5-5l5 5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div>
+                <span>SAFE TO SKIP</span>
+                <strong>9 periods</strong>
+              </div>
+              <span class="preview-insight__fine">while staying at 75%+</span>
+            </div>
+            <div class="preview-subjects">
+              <div class="preview-subject">
+                <span>Artificial Intelligence</span>
+                <div class="mini-bar"><span style="width:88%"></span><i></i></div>
+                <strong>88%</strong>
+              </div>
+              <div class="preview-subject">
+                <span>Data Science</span>
+                <div class="mini-bar"><span style="width:76%"></span><i></i></div>
+                <strong>76%</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="teacher-float">
+            <div class="teacher-float__head">
+              <span class="teacher-float__check">
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4.5 10.5l3.6 3.5 7.4-7.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <div>
+                <strong>Roll call saved</strong>
+                <span>AI Lab • P1–P2 • 2 periods</span>
+              </div>
+            </div>
+            <div class="teacher-float__counts">
+              <span><b>74</b> present</span>
+              <span><b>2</b> absent</span>
+              <span class="teacher-float__time">just now</span>
+            </div>
+          </div>
+
+          <div class="threshold-float">
+            <span class="threshold-float__number">75%</span>
+            <span>college requirement</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="portal-section" id="portals">
+        <div class="section-heading">
+          <p class="eyebrow">TWO PORTALS, ONE SOURCE OF TRUTH</p>
+          <h2>Pick your side of the classroom.</h2>
+          <p>Everyone gets the right view. No spreadsheets, no screenshots, no “what's my attendance?” messages at midnight.</p>
+        </div>
+        <div class="portal-grid">
+          <a class="portal-card portal-card--student" href="/student/login">
+            <div class="portal-card__top">
+              <span class="portal-icon">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 9.5L12 4l9 5.5-9 5.5L3 9.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M7 12.3v5.2c2.7 1.9 7.3 1.9 10 0v-5.2M21 9.5v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              </span>
+              <span class="portal-arrow">
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 15L15 5m0 0H7m8 0v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+            </div>
+            <p class="eyebrow">FOR STUDENTS</p>
+            <h3>Your attendance,<br>without the guesswork.</h3>
+            <p class="portal-card__copy">Sign in with your register number and see exactly where you stand, down to the next period.</p>
+            <ul class="portal-points">
+              <li><span>✓</span> Live overall &amp; subject attendance</li>
+              <li><span>✓</span> Safe-to-skip allowance</li>
+              <li><span>✓</span> Weekly timetable &amp; holiday exclusions</li>
+            </ul>
+            <span class="portal-cta">Student login <span>→</span></span>
+          </a>
+
+          <a class="portal-card portal-card--teacher" href="/teacher/login">
+            <div class="portal-card__top">
+              <span class="portal-icon">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 19.5h16M6 16l2.3-5.3L13 15l5-9 2 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.3 10.7l4.7 4.3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              </span>
+              <span class="portal-arrow">
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 15L15 5m0 0H7m8 0v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+            </div>
+            <p class="eyebrow">FOR TEACHERS</p>
+            <h3>Roll call that takes<br>seconds, not minutes.</h3>
+            <p class="portal-card__copy">Open the class, tap the absentees, save. Every student's dashboard updates instantly.</p>
+            <ul class="portal-points">
+              <li><span>✓</span> One-tap present / absent marking</li>
+              <li><span>✓</span> Labs &amp; CTV counted for their full span</li>
+              <li><span>✓</span> Mark holidays without hurting attendance</li>
+            </ul>
+            <span class="portal-cta">Teacher login <span>→</span></span>
+          </a>
+        </div>
+      </section>
+
+      <section class="how-section" id="how-it-works">
+        <div class="how-intro">
+          <p class="eyebrow">THE WHOLE LOOP</p>
+          <h2>From roll call to<br>your next free period.</h2>
+        </div>
+        <div class="how-grid">
+          <article class="how-card">
+            <span class="how-number">01</span>
+            <span class="how-icon">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="3.5" width="16" height="17" rx="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M8 8h8M8 12h8M8 16h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </span>
+            <h3>Teacher marks the class</h3>
+            <p>Pick the period from the MCA-1 timetable. Everyone starts present — tap only the students who are absent. Labs and CTV are marked once.</p>
+          </article>
+          <article class="how-card">
+            <span class="how-number">02</span>
+            <span class="how-icon">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="1.6"/></svg>
+            </span>
+            <h3>Numbers update live</h3>
+            <p>The moment attendance is saved, every student's percentage, subject breakdown and guidance recalculate.</p>
+          </article>
+          <article class="how-card">
+            <span class="how-number">03</span>
+            <span class="how-icon">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 17l5-5 4 3.5L20 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 7h5v5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <h3>Students plan ahead</h3>
+            <p>See how many periods are safe to miss — or exactly how many to attend to climb back to 75%.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="closing-cta">
+        <div>
+          <p class="eyebrow eyebrow--light">NO MORE ATTENDANCE MATH</p>
+          <h2>Every period counts.<br><em>Now you can see it.</em></h2>
+        </div>
+        <div class="closing-cta__actions">
+          <a class="btn btn--lime btn--large" href="/student/login">Check my attendance</a>
+          <a class="btn btn--outline-light btn--large" href="/teacher/login">Take attendance</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="brand brand--light" href="/" aria-label="RollCall home">
+        <span class="brand__mark" aria-hidden="true">
+          <svg viewBox="0 0 28 28" fill="none"><path d="M7 14.5l4.3 4.2L21 8.8" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="brand__name">RollCall<span class="brand__dot">.</span></span>
+      </a>
+      <p>RollCall · GVP IHLR · School of Science · MCA 1st Semester</p>
+      <div class="site-footer__links">
+        <a href="/student/login">Student portal</a>
+        <a href="/teacher/login">Teacher portal</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

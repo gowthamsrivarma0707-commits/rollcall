@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f1e9">
+  <meta name="description" content="Take attendance and manage class records in RollCall.">
+  <title>Admin console · RollCall</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="stylesheet" href="/static/css/teacher.css">
+</head>
+<body class="app-page teacher-page">
+  <header class="app-header app-header--teacher">
+    <div class="app-header__inner container">
+      <a class="brand brand--dark" href="/admin" aria-label="RollCall admin home">
+        <span class="brand__mark" aria-hidden="true">
+          <svg viewBox="0 0 28 28" fill="none"><path d="M7 14.5l4.3 4.2L21 8.8" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="brand__name">RollCall<span class="brand__dot">.</span></span>
+      </a>
+
+      <nav class="app-tabs" id="teacherTabs" aria-label="Teacher sections">
+        <button class="app-tab is-active" type="button" data-view="overview" aria-current="page">Overview</button>
+        <button class="app-tab" type="button" data-view="mark">Take attendance</button>
+        <button class="app-tab" type="button" data-view="records">Records</button>
+        <button class="app-tab" type="button" data-view="students">Students</button>
+      </nav>
+
+      <div class="app-header__actions">
+        <span class="live-pill live-pill--header"><span></span> Admin</span>
+        <div class="profile-chip">
+          <span class="avatar avatar--teacher" id="teacherAvatar" aria-hidden="true">—</span>
+          <span class="profile-chip__text">
+            <strong id="teacherName">Loading…</strong>
+            <small id="teacherDepartment">—</small>
+          </span>
+          <a class="icon-button icon-button--quiet" href="/change-password" aria-label="Change password" title="Change password">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 14.5 14.2 4.3a4.6 4.6 0 0 1 6.5 6.5L10.5 21M4 14.5l-1 4.5 4.5-1M14.5 10.5l-4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+          <button class="icon-button icon-button--quiet" type="button" data-logout aria-label="Sign out" title="Sign out">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5H6a2 2 0 00-2 2v10a2 2 0 002 2h3M15 8l4 4-4 4m4-4H9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="must-change-banner" id="mustChangeBanner" role="alert" hidden>
+    <span class="must-change-banner__dot" aria-hidden="true"></span>
+    <span class="must-change-banner__text">You are still on your college-issued password — anyone who knows it can open your account. <a href="/change-password">Change it now →</a></span>
+    <button class="must-change-banner__later" id="mustChangeLater" type="button">Later today</button>
+  </div>
+
+  <main class="container teacher-main">
+    <div class="inline-alert" id="pageError" role="alert" hidden>
+      <span>We couldn't load the teacher dashboard.</span>
+      <button class="text-button" id="retryButton" type="button">Try again</button>
+    </div>
+
+    <!-- OVERVIEW -->
+    <section class="teacher-view" id="view-overview">
+      <div class="welcome-row welcome-row--teacher">
+        <div>
+          <p class="eyebrow">ADMIN CONSOLE</p>
+          <h1>Welcome, <span id="teacherFirstName">Principal</span>.</h1>
+          <p class="welcome-sub"><span id="teacherClassLine">Your classes are ready when you are.</span> <span class="updated-at" id="teacherUpdatedAt">Updating…</span></p>
+        </div>
+        <button class="btn btn--dark" id="startAttendanceButton" type="button">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          Take attendance
+        </button>
+      </div>
+
+      <section class="teacher-hero">
+        <div class="teacher-hero__copy">
+          <span class="teacher-hero__badge"><span class="live-dot"></span> Ready for roll call</span>
+          <h2>Attendance, before<br>the class settles.</h2>
+          <p>Pick the period from your timetable. Tap the absentees. Save once — every student's dashboard updates on its own.</p>
+          <div class="teacher-hero__actions">
+            <button class="btn btn--lime" id="heroStartButton" type="button">Start today's roll call</button>
+            <button class="text-link" id="heroRecordsButton" type="button">View saved records <span>→</span></button>
+          </div>
+        </div>
+        <div class="teacher-hero__visual" aria-hidden="true">
+          <div class="rollcall-preview">
+            <div class="rollcall-preview__head">
+              <div><span>MCA-1</span><strong>AI Lab</strong></div>
+              <span class="live-pill live-pill--mini"><span></span> Live</span>
+            </div>
+            <div class="rollcall-preview__student">
+              <span class="mini-avatar mini-avatar--2">AR</span>
+              <span>26PSMCA0001 · Adireddi Revanth</span>
+              <span class="mark mark--present">✓</span>
+            </div>
+            <div class="rollcall-preview__student">
+              <span class="mini-avatar mini-avatar--3">AD</span>
+              <span>26PSMCA0002 · Alabana Durga Ram</span>
+              <span class="mark mark--present">✓</span>
+            </div>
+            <div class="rollcall-preview__student">
+              <span class="mini-avatar mini-avatar--4">BU</span>
+              <span>26PSMCA0006 · Bayana Urmila</span>
+              <span class="mark mark--absent">×</span>
+            </div>
+            <div class="rollcall-preview__save">
+              <span>74 present · 02 absent</span>
+              <span class="mini-save">Save attendance</span>
+            </div>
+          </div>
+          <div class="teacher-hero__stamp">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.3 4.2L19 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Saved<br><strong>seconds</strong></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="stats-grid" aria-label="Teaching summary">
+        <article class="stat-card">
+          <span class="stat-card__icon stat-card__icon--green">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 19.5h16M5.5 16V8.8L12 4l6.5 4.8V16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 19.5v-5h6v5" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          </span>
+          <div><span>My classes</span><strong id="statClasses">—</strong></div>
+          <small id="statClassesNote">sections assigned</small>
+        </article>
+        <article class="stat-card">
+          <span class="stat-card__icon stat-card__icon--sand">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 19c.4-3.4 2.5-5.2 5.5-5.2s5.1 1.8 5.5 5.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M15.5 5.6a3 3 0 010 5.4M17.5 19c-.2-2.4-1.2-4-2.7-4.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </span>
+          <div><span>Students</span><strong id="statStudents">—</strong></div>
+          <small>across your sections</small>
+        </article>
+        <article class="stat-card">
+          <span class="stat-card__icon stat-card__icon--coral">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M8 3v4M16 3v4M4 10h16M8 14h3M8 17h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </span>
+          <div><span>Saved today</span><strong id="statSessions">—</strong></div>
+          <small id="statSessionsNote">roll call sessions</small>
+        </article>
+        <article class="stat-card">
+          <span class="stat-card__icon stat-card__icon--lime">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 17l5-5 4 3.5L20 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 7h5v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <div><span>Present today</span><strong id="statPercentage">—</strong></div>
+          <small id="statPercentageNote">No records yet today</small>
+        </article>
+      </section>
+
+      <section class="card security-card" id="securityCard" hidden aria-label="Accounts still on default password">
+        <div class="card-head">
+          <div>
+            <p class="eyebrow">SECURITY</p>
+            <h2>Accounts still on default password</h2>
+          </div>
+          <span class="card-head__aside" id="securitySummary">—</span>
+        </div>
+        <p class="security-card__hint">Until every account changes, any student can open another account — just like today. Ask these students in class, or reset from office.</p>
+        <div class="security-card__lists">
+          <div>
+            <h3>Students <span id="securityStudentCount">0</span></h3>
+            <ul class="security-card__list" id="securityStudentList"></ul>
+          </div>
+          <div>
+            <h3>Teachers <span id="securityTeacherCount">0</span></h3>
+            <ul class="security-card__list" id="securityTeacherList"></ul>
+          </div>
+        </div>
+      </section>
+
+      <div class="teacher-columns">
+        <section class="card classes-card">
+          <div class="card-head">
+            <div>
+              <p class="eyebrow">YOUR CLASSROOMS</p>
+              <h2>Pick a subject to begin.</h2>
+            </div>
+            <span class="card-head__aside">Tap to mark</span>
+          </div>
+          <div class="class-list" id="classListOverview">
+            <div class="skeleton skeleton--row"></div>
+            <div class="skeleton skeleton--row"></div>
+          </div>
+        </section>
+
+        <aside class="card today-card">
+          <div class="card-head">
+            <div>
+              <p class="eyebrow">TODAY</p>
+              <h2 id="todayLabel">—</h2>
+            </div>
+            <span class="today-card__dot" aria-hidden="true"></span>
+          </div>
+          <div class="today-progress">
+            <div class="today-progress__ring" id="todayRing" style="--value:0">
+              <div><strong id="todayPercentage">—</strong><span>present</span></div>
+            </div>
+            <div class="today-progress__copy">
+              <strong id="todayHeadline">A clean slate.</strong>
+              <p id="todayCopy">No roll calls have been saved for today yet.</p>
+            </div>
+          </div>
+          <div class="today-meta">
+            <span><b id="todaySessions">0</b> sessions saved</span>
+            <span><b id="todayMarked">0</b> marks recorded</span>
+          </div>
+          <button class="btn btn--soft btn--full" id="todayStartButton" type="button">Mark today's first class</button>
+        </aside>
+      </div>
+
+      <section class="card today-timetable-card">
+        <div class="card-head">
+          <div>
+            <p class="eyebrow">TODAY'S TIMETABLE</p>
+            <h2 id="todayTimetableTitle">Loading today's classes…</h2>
+          </div>
+          <span class="card-head__aside" id="todayTimetableCount">—</span>
+        </div>
+        <div class="tt-strip" id="todayTimetable">
+          <div class="skeleton skeleton--row"></div>
+        </div>
+      </section>
+
+      <section class="card recent-sessions-card">
+        <div class="card-head">
+          <div>
+            <p class="eyebrow">RECENT ACTIVITY</p>
+            <h2>Your saved roll calls.</h2>
+          </div>
+          <button class="text-link text-link--dark" id="viewAllRecordsButton" type="button">View all records <span>→</span></button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr><th>Date</th><th>Class</th><th>Subject</th><th>Period</th><th>Present / absent</th><th>Attendance</th><th><span class="sr-only">Actions</span></th></tr>
+            </thead>
+            <tbody id="recentSessionsBody">
+              <tr><td colspan="7"><div class="skeleton skeleton--row"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <!-- MARK ATTENDANCE -->
+    <section class="teacher-view" id="view-mark" hidden>
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">ROLL CALL</p>
+          <h1>Take attendance.</h1>
+          <p>Pick a day, then choose a period from the MCA-1 timetable. Labs count as two periods and the CTV interactive program counts as three — each is marked once.</p>
+        </div>
+        <button class="btn btn--ghost btn--small" type="button" data-view-go="overview">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M16 10H4m5-5l-5 5 5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Back to overview
+        </button>
+      </div>
+
+      <section class="attendance-toolbar card" aria-label="Attendance selection">
+        <div class="form-field form-field--compact">
+          <label for="markDate">Date</label>
+          <input id="markDate" type="date">
+        </div>
+        <button class="btn btn--ghost btn--small toolbar-today" id="markTodayButton" type="button">Today</button>
+        <div class="toolbar-note">
+          <span class="live-dot"></span>
+          Only scheduled periods<br>can be marked.
+        </div>
+      </section>
+
+      <section class="card slot-picker" id="slotPicker">
+        <div class="card-head">
+          <div>
+            <p class="eyebrow">TIMETABLE</p>
+            <h2 id="slotPickerTitle">Choose a period.</h2>
+          </div>
+          <span class="card-head__aside" id="slotPickerMeta">—</span>
+        </div>
+        <div class="slot-grid" id="markSlots"></div>
+      </section>
+
+      <section class="roster-card card" id="rosterCard" data-state="loading">
+        <div class="roster-head">
+          <div>
+            <p class="eyebrow" id="rosterKicker">SELECT A PERIOD</p>
+            <h2 id="rosterTitle">Choose a period from the timetable.</h2>
+            <p class="roster-meta" id="rosterSubtitle">Attendance is saved against the selected period.</p>
+          </div>
+          <div class="roster-head__aside">
+            <span class="save-state" id="saveState">New roll call</span>
+            <span class="count-pill"><b id="presentCount">0</b> present · <b id="absentCount">0</b> absent</span>
+            <button class="holiday-toggle" id="holidayButton" type="button" disabled>
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="3.5" y="4.5" width="13" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 3v3M13 3v3M3.5 8.5h13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <span id="holidayButtonText">Mark as holiday</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="holiday-banner" id="holidayBanner" hidden>
+          <span class="holiday-banner__icon" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M10 2.8l2.2 4.5 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L2.8 8l5-.7L10 2.8Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+          </span>
+          <div>
+            <strong>Marked as a holiday</strong>
+            <span>This period is excluded from every student's attendance percentage.</span>
+          </div>
+        </div>
+
+        <div class="roster-tools">
+          <div class="bulk-actions">
+            <span>Quick mark:</span>
+            <button class="bulk-button bulk-button--present" type="button" data-bulk="present">
+              <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.3l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              All present
+            </button>
+            <button class="bulk-button bulk-button--absent" type="button" data-bulk="absent">
+              <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              All absent
+            </button>
+          </div>
+          <label class="search-field" for="rosterSearch">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="5.2" stroke="currentColor" stroke-width="1.5"/><path d="M13 13l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <input id="rosterSearch" type="search" placeholder="Find a student…" autocomplete="off">
+          </label>
+        </div>
+
+        <div class="roster-columns" aria-hidden="true">
+          <span>Student</span>
+          <span>Attendance</span>
+        </div>
+        <div class="roster-list" id="rosterList">
+          <div class="roster-loading">
+            <div class="skeleton skeleton--row"></div>
+            <div class="skeleton skeleton--row"></div>
+            <div class="skeleton skeleton--row"></div>
+          </div>
+        </div>
+
+        <div class="roster-savebar">
+          <div>
+            <strong id="saveSummary">0 present · 0 absent</strong>
+            <span id="saveHelp">Load a class to begin.</span>
+          </div>
+          <button class="btn btn--dark btn--large" id="saveAttendanceButton" type="button" disabled>
+            <span class="btn-spinner" aria-hidden="true"></span>
+            <span class="btn-text" id="saveButtonText">Save attendance</span>
+            <svg class="btn-arrow" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10h12m-5-5l5 5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </section>
+    </section>
+
+    <!-- RECORDS -->
+    <section class="teacher-view" id="view-records" hidden>
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">ATTENDANCE HISTORY</p>
+          <h1>Saved records.</h1>
+          <p>Review any past roll call. Select Edit to correct a student's attendance.</p>
+        </div>
+        <button class="btn btn--dark btn--small" id="newAttendanceButton" type="button">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          New attendance
+        </button>
+      </div>
+
+      <section class="records-filter card" aria-label="Filter records">
+        <div class="form-field form-field--compact">
+          <label for="recordsClassFilter">Class</label>
+          <select id="recordsClassFilter"></select>
+        </div>
+        <div class="form-field form-field--compact">
+          <label for="recordsSubjectFilter">Subject</label>
+          <select id="recordsSubjectFilter"></select>
+        </div>
+        <button class="btn btn--ghost btn--small records-filter__refresh" id="refreshRecordsButton" type="button">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M17 9a7 7 0 10-2.1 5M17 4v5h-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Refresh
+        </button>
+        <span class="records-filter__count" id="recordsCount">— records</span>
+      </section>
+
+      <section class="card records-card">
+        <div class="table-wrap">
+          <table class="data-table data-table--records">
+            <thead>
+              <tr><th>Date</th><th>Class</th><th>Subject</th><th>Period</th><th>Present / absent</th><th>Attendance</th><th><span class="sr-only">Actions</span></th></tr>
+            </thead>
+            <tbody id="recordsBody">
+              <tr><td colspan="7"><div class="skeleton skeleton--row"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="records-foot">
+          <p><span class="live-dot"></span> Students see edits as soon as you save them.</p>
+          <p>Only your assigned classes and subjects appear here.</p>
+        </div>
+      </section>
+    </section>
+
+    <!-- STUDENTS -->
+    <section class="teacher-view" id="view-students" hidden>
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">CLASS MONITOR</p>
+          <h1>Student attendance.</h1>
+          <p>Live attendance and percentage against the 75% requirement for every student in the class.</p>
+        </div>
+        <button class="btn btn--dark btn--small" id="studentsRefreshButton" type="button">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M17 9a7 7 0 10-2.1 5M17 4v5h-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Refresh
+        </button>
+      </div>
+
+      <section class="records-filter card" aria-label="Filter students">
+        <div class="form-field form-field--compact">
+          <label for="studentsClassFilter">Class</label>
+          <select id="studentsClassFilter"></select>
+        </div>
+        <div class="form-field form-field--compact">
+          <label for="studentsSubjectFilter">Subject</label>
+          <select id="studentsSubjectFilter"></select>
+        </div>
+        <span class="records-filter__count" id="studentsCount">— students</span>
+      </section>
+
+      <section class="card records-card">
+        <div class="table-wrap">
+          <table class="data-table data-table--students">
+            <thead>
+              <tr><th>#</th><th>Register no</th><th>Name</th><th>Attended</th><th>Total</th><th>Attendance</th><th>Requirement</th></tr>
+            </thead>
+            <tbody id="studentsBody">
+              <tr><td colspan="7"><div class="skeleton skeleton--row"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="students-export">
+          <div class="students-export__text">
+            <strong>Download monthly report</strong>
+            <span>Overall summary plus one sheet per subject, with 1 = present and 0 = absent.</span>
+          </div>
+          <input type="month" id="studentsExportMonth" aria-label="Report month">
+          <button class="btn btn--dark btn--small" id="studentsDownloadButton" type="button">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 3.5v9.5M6.8 9.7L10 12.9l3.2-3.2M4.5 15.5h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span id="studentsDownloadText">Download Excel</span>
+          </button>
+        </div>
+        <div class="records-foot">
+          <p><span class="live-dot"></span> Percentages update as soon as attendance is saved.</p>
+          <p>Holidays are excluded from every count.</p>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="/static/js/common.js"></script>
+  <script src="/static/js/teacher.js"></script>
+</body>
+</html>
