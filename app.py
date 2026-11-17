@@ -64,6 +64,10 @@ APP_NAME = "RollCall"
 TARGET_PERCENT = 75
 SESSION_COOKIE = "rollcall_session"
 SESSION_ROLES = ("student", "teacher", "admin")
+# Portal separation for the two staff accounts: the principal signs in from
+# the teacher login, the Administrator from the admin login. Cross sign-in is
+# rejected with the generic "details do not match" error.
+PRINCIPAL_USERNAME = "principal"
 SESSION_TTL_SECONDS = 14 * 24 * 60 * 60
 MAX_BODY_BYTES = 1_000_000
 STATIC_SUFFIXES = {
@@ -1325,6 +1329,10 @@ class RollCallHandler(BaseHTTPRequestHandler):
                     """,
                     (username,),
                 ).fetchone()
+                if row and row["username"].lower() == PRINCIPAL_USERNAME:
+                    # The principal account signs in from the teacher login
+                    # only; reject it here like any unknown credential.
+                    row = None
             else:
                 row = conn.execute(
                     """
@@ -1335,8 +1343,8 @@ class RollCallHandler(BaseHTTPRequestHandler):
                     (username, username),
                 ).fetchone()
                 if not row:
-                    # Allow the principal/admin account to sign in from the
-                    # teacher login as well, so there is one staff entry point.
+                    # Allow the principal account to sign in from the teacher
+                    # login as well, so there is one staff entry point.
                     admin_row = conn.execute(
                         """
                         SELECT id, name, username, password_hash
@@ -1345,7 +1353,9 @@ class RollCallHandler(BaseHTTPRequestHandler):
                         """,
                         (username,),
                     ).fetchone()
-                    if admin_row:
+                    if admin_row and admin_row["username"].lower() == PRINCIPAL_USERNAME:
+                        # Only the principal account may enter from the teacher
+                        # login; the Administrator uses its own portal.
                         row = admin_row
                         role = "admin"
 
