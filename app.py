@@ -293,6 +293,25 @@ def init_db(reset: bool = False) -> None:
 
             seed_database(conn)
 
+        # Ensure Administrator account is guaranteed to exist across cloud deploys
+        admin_check = conn.execute(
+            "SELECT id FROM admins WHERE username = 'Administrator' COLLATE NOCASE"
+        ).fetchone()
+        if not admin_check:
+            now_iso = datetime.now().isoformat(timespec="seconds")
+            conn.execute(
+                """
+                INSERT INTO admins (username, name, password_hash, must_change_password, created_at)
+                VALUES (?, ?, ?, 0, ?)
+                """,
+                (
+                    "Administrator",
+                    "Administrator",
+                    hash_password("admin@2026"),
+                    now_iso,
+                ),
+            )
+
 
 def _all_teachers() -> list[sqlite3.Row]:
     with get_db() as conn:
