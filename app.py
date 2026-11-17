@@ -79,6 +79,8 @@ STATIC_SUFFIXES = {
     ".woff",
     ".woff2",
     ".ttf",
+    ".txt",
+    ".xml",
 }
 
 
