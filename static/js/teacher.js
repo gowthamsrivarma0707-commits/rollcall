@@ -199,7 +199,7 @@
       "teacherClassLine",
       `${stats.classes} ${plural(stats.classes, "class", "classes")} · ${stats.students} ${plural(stats.students, "student")}${campus.short ? ` · ${campus.short}` : ""}`
     );
-    setText("teacherUpdatedAt", `Updated ${formatTime(data.updated_at)}`);
+    setText("teacherUpdatedAt", "Status updated");
 
     setText("statClasses", stats.classes);
     setText(
@@ -359,7 +359,7 @@
       <tr class="${holiday ? "is-holiday" : ""}">
         <td>
           <span class="table-date">${escapeHTML(formatDate(session.date))}</span>
-          <span class="table-sub">${session.updated_at ? escapeHTML(formatTime(session.updated_at)) : "—"}</span>
+          <span class="table-sub">${session.updated_at ? "Status updated" : "—"}</span>
         </td>
         <td><span class="table-class">${escapeHTML(session.class_code)}</span></td>
         <td><span class="table-subject" title="${escapeHTML(session.subject_name)}">${escapeHTML(session.subject_name)}</span>${
@@ -868,7 +868,7 @@
     setText(
       "saveHelp",
       roster.is_existing
-        ? `Last saved ${formatTime(roster.updated_at)}. Changes update students immediately.`
+        ? "Attendance taken. Changes update students immediately."
         : "Everyone starts present. Tap a student to mark them absent."
     );
     updateRosterCounts();
