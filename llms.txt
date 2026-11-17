@@ -1,0 +1,18 @@
+# RollCall
+
+> Live college attendance portal for students and teachers.
+
+## What is RollCall?
+
+RollCall is a lightweight, self-hosted attendance management system built for colleges. Students can check their attendance percentage and teachers can mark roll call in seconds.
+
+## Pages
+
+- `/` — Landing page (public)
+- `/student` — Student attendance dashboard (login required)
+- `/teacher` — Teacher attendance dashboard (login required)
+- `/admin` — Admin console (admin login required)
+
+## Contact
+
+For integration or API access, contact the college IT administrator.

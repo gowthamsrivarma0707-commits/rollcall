@@ -1,0 +1,11 @@
+User-agent: *
+Disallow: /student
+Disallow: /teacher
+Disallow: /admin
+Disallow: /api/
+Disallow: /student/login
+Disallow: /teacher/login
+Disallow: /admin/login
+Allow: /
+
+Sitemap: https://rollcall.onrender.com/sitemap.xml

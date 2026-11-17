@@ -1028,6 +1028,12 @@ class RollCallHandler(BaseHTTPRequestHandler):
         if path == "/favicon.ico":
             self._serve_static("/static/favicon.svg")
             return
+        if path == "/robots.txt":
+            self._serve_static("/static/robots.txt")
+            return
+        if path == "/sitemap.xml":
+            self._serve_static("/static/sitemap.xml")
+            return
         if path.startswith("/static/"):
             self._serve_static(path)
             return
