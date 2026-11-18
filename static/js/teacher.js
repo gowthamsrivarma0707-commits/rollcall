@@ -912,27 +912,33 @@
       } catch (_) {}
 
       if (!cachedRoster) {
+        let studentsList = null;
         try {
           const rawStudents = localStorage.getItem(`rollcall_cache_students_${params.classId}`);
-          if (rawStudents) {
-            const studentsList = JSON.parse(rawStudents);
-            const slot = state.selected || {};
-            cachedRoster = {
-              class: { id: params.classId, name: "MCA 1st Semester", code: "MCA-1" },
-              subject: { id: params.subjectId, name: slot.subject_name || "Subject", code: slot.subject_code || "SUB" },
-              date: params.date,
-              period: params.period,
-              span: slot.span || 1,
-              period_label: slot.period_label || `Period ${params.period}`,
-              time_label: slot.time_label || "",
-              faculty: slot.faculty || "",
-              is_holiday: false,
-              is_existing: false,
-              session_id: null,
-              students: studentsList.map((s) => ({ ...s, status: "present" })),
-            };
-          }
+          if (rawStudents) studentsList = JSON.parse(rawStudents);
         } catch (_) {}
+
+        if (!studentsList && window.ROLLCALL_DEFAULT_STUDENTS) {
+          studentsList = window.ROLLCALL_DEFAULT_STUDENTS;
+        }
+
+        if (studentsList) {
+          const slot = state.selected || {};
+          cachedRoster = {
+            class: { id: params.classId, name: "MCA 1st Semester", code: "MCA-1" },
+            subject: { id: params.subjectId, name: slot.subject_name || "Subject", code: slot.subject_code || "SUB" },
+            date: params.date,
+            period: params.period,
+            span: slot.span || 1,
+            period_label: slot.period_label || `Period ${params.period}`,
+            time_label: slot.time_label || "",
+            faculty: slot.faculty || "",
+            is_holiday: false,
+            is_existing: false,
+            session_id: null,
+            students: studentsList.map((s) => ({ ...s, status: "present" })),
+          };
+        }
       }
 
       if (cachedRoster) {
