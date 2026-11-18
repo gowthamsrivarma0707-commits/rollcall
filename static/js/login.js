@@ -144,16 +144,71 @@
     const originalLabel = document.getElementById("loginButtonText").textContent;
     const buttonText = document.getElementById("loginButtonText");
 
+    async function hashPassword(str) {
+      const buffer = new TextEncoder().encode(str);
+      const digest = await crypto.subtle.digest("SHA-256", buffer);
+      return Array.from(new Uint8Array(digest))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+    }
+
     try {
+      if (!navigator.onLine) {
+        throw new Error("Offline");
+      }
       const data = await api.post(
         "/api/login",
         { role, username: usernameValue, password: passwordValue },
         { redirectOn401: false }
       );
       if (buttonText) buttonText.textContent = "Signing you in…";
+
+      // Cache offline login credentials on this device for zero-network situations
+      try {
+        const passHash = await hashPassword(passwordValue);
+        localStorage.setItem(
+          `rollcall_offline_auth_${role}`,
+          JSON.stringify({
+            username: usernameValue.toLowerCase(),
+            passHash: passHash,
+            redirect: data.redirect || (isTeacher ? "/teacher" : "/student"),
+            savedAt: Date.now(),
+          })
+        );
+      } catch (_) {}
+
       window.location.assign(data.redirect || (isTeacher ? "/teacher" : "/student"));
     } catch (error) {
-      showError(error.message || "Sign-in failed. Please try again.");
+      const isOffline =
+        !navigator.onLine ||
+        error.message === "Offline" ||
+        error.message.includes("Could not reach") ||
+        error.message.includes("connection");
+
+      if (isOffline) {
+        // Attempt offline device authentication
+        try {
+          const raw = localStorage.getItem(`rollcall_offline_auth_${role}`);
+          if (raw) {
+            const cached = JSON.parse(raw);
+            const passHash = await hashPassword(passwordValue);
+            if (
+              cached.username === usernameValue.toLowerCase() &&
+              cached.passHash === passHash
+            ) {
+              if (buttonText) buttonText.textContent = "Opening offline…";
+              localStorage.setItem("rollcall_offline_session", "true");
+              window.location.assign(cached.redirect || (isTeacher ? "/teacher" : "/student"));
+              return;
+            }
+          }
+        } catch (_) {}
+
+        showError("Device is offline. If you signed in here previously, check your password, or reconnect to internet.");
+      } else {
+        showError(error.message || "Sign-in failed. Please try again.");
+      }
+
       setButtonLoading(loginButton, false);
       if (buttonText) buttonText.textContent = originalLabel;
       password.focus();
@@ -161,5 +216,11 @@
     }
   });
 
+  // Register service worker on login page as well
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    });
+  }
 
 })();

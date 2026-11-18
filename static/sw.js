@@ -1,11 +1,14 @@
 /* RollCall Service Worker for Offline-First Teacher Attendance */
-const CACHE_NAME = "rollcall-teacher-v1";
+const CACHE_NAME = "rollcall-teacher-v2";
 const ASSETS_TO_CACHE = [
   "/teacher",
+  "/teacher/login",
   "/static/css/base.css",
   "/static/css/app.css",
+  "/static/css/auth.css",
   "/static/css/teacher.css",
   "/static/js/common.js",
+  "/static/js/login.js",
   "/static/js/teacher.js",
   "/static/favicon.svg"
 ];
@@ -40,9 +43,10 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
 
-  // If it's a static file or the teacher page, try network first, fallback to cache
+  // If it's a static file or the teacher page / login, try network first, fallback to cache
   if (
     url.pathname === "/teacher" ||
+    url.pathname === "/teacher/login" ||
     url.pathname.startsWith("/static/")
   ) {
     event.respondWith(
@@ -58,6 +62,9 @@ self.addEventListener("fetch", (event) => {
           return caches.match(request).then((cached) => {
             if (cached) return cached;
             if (request.mode === "navigate") {
+              if (url.pathname === "/teacher/login") {
+                return caches.match("/teacher/login");
+              }
               return caches.match("/teacher");
             }
           });
