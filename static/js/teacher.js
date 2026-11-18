@@ -153,9 +153,140 @@
     }
   }
 
+  /* ---------------------------------------------------------
+     Offline Sync & Storage Helpers
+     --------------------------------------------------------- */
+  const OFFLINE_QUEUE_KEY = "rollcall_offline_queue";
+
+  function getOfflineQueue() {
+    try {
+      const raw = localStorage.getItem(OFFLINE_QUEUE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveOfflineQueue(queue) {
+    try {
+      localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+    } catch (err) {
+      console.warn("Could not save offline queue:", err);
+    }
+    updateOfflineBanner();
+  }
+
+  function queueOfflineAttendance(params, records) {
+    const queue = getOfflineQueue();
+    const existingIndex = queue.findIndex(
+      (item) =>
+        item.class_id === params.classId &&
+        item.date === params.date &&
+        item.period === params.period
+    );
+    const item = {
+      id: "offline_" + Date.now(),
+      class_id: params.classId,
+      subject_id: params.subjectId,
+      date: params.date,
+      period: params.period,
+      substitute: Boolean(params.substitute),
+      records: records,
+      period_label: state.selected?.period_label || `Period ${params.period}`,
+      saved_at: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    };
+    if (existingIndex >= 0) {
+      queue[existingIndex] = item;
+    } else {
+      queue.push(item);
+    }
+    saveOfflineQueue(queue);
+    return item;
+  }
+
+  function updateOfflineBanner() {
+    const banner = $("offlineSyncBanner");
+    const text = $("offlineSyncText");
+    if (!banner || !text) return;
+    const queue = getOfflineQueue();
+    if (!queue.length) {
+      banner.hidden = true;
+    } else {
+      banner.hidden = false;
+      const count = queue.length;
+      text.textContent = `${count} offline roll call${count > 1 ? "s" : ""} saved on this device. Waiting for internet to sync.`;
+    }
+  }
+
+  let isSyncing = false;
+  async function syncOfflineQueue() {
+    if (isSyncing || !navigator.onLine) return;
+    const queue = getOfflineQueue();
+    if (!queue.length) return;
+
+    isSyncing = true;
+    const btn = $("manualSyncButton");
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Syncing…";
+    }
+
+    let syncedCount = 0;
+    const remaining = [];
+
+    for (const item of queue) {
+      try {
+        await api.post("/api/teacher/attendance", {
+          class_id: item.class_id,
+          subject_id: item.subject_id,
+          date: item.date,
+          period: item.period,
+          substitute: item.substitute,
+          records: item.records,
+        });
+        syncedCount++;
+      } catch (err) {
+        console.warn("Failed to sync item:", item, err);
+        remaining.push(item);
+      }
+    }
+
+    saveOfflineQueue(remaining);
+    isSyncing = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Sync now";
+    }
+    updateOfflineBanner();
+
+    if (syncedCount > 0) {
+      toast(`Successfully synced ${syncedCount} offline session(s) to website! 🟢`, "success");
+      loadDashboard({ silent: true });
+    }
+  }
+
+  function updateNetworkStatus() {
+    const pill = $("networkPill");
+    const text = $("networkText");
+    const isOnline = navigator.onLine;
+    if (pill && text) {
+      if (isOnline) {
+        pill.classList.remove("is-offline");
+        pill.classList.add("is-online");
+        text.textContent = "Online";
+      } else {
+        pill.classList.remove("is-online");
+        pill.classList.add("is-offline");
+        text.textContent = "Offline";
+      }
+    }
+    updateOfflineBanner();
+  }
+
   async function loadDashboard({ silent = false } = {}) {
     try {
       const data = await api.get("/api/teacher/overview");
+      try { localStorage.setItem("rollcall_cache_overview", JSON.stringify(data)); } catch (_) {}
       state.data = data;
       state.classes = data.classes || [];
       state.assignments = data.assignments || [];
@@ -177,6 +308,32 @@
       $("pageError").hidden = true;
       return data;
     } catch (error) {
+      const cached = localStorage.getItem("rollcall_cache_overview");
+      if (cached) {
+        try {
+          const data = JSON.parse(cached);
+          state.data = data;
+          state.classes = data.classes || [];
+          state.assignments = data.assignments || [];
+          state.timetable = data.timetable || [];
+          state.today = data.server_date || new Date().toISOString().slice(0, 10);
+          state.todaySlots = data.today ? data.today.slots : [];
+          applyHolidayFlags();
+          renderOverview(data);
+          if (!state.initialized) {
+            initializeMarkControls();
+            initializeRecordFilters();
+            initializeStudentsControls();
+            initializeStudentsExport();
+            state.initialized = true;
+          } else if (state.view === "mark") {
+            renderMarkSlots();
+          }
+          $("pageError").hidden = true;
+          toast("Loaded from offline memory (no connection)", "info");
+          return data;
+        } catch (_) {}
+      }
       if (!silent) {
         $("pageError").hidden = false;
         toast(error.message, "error");
@@ -713,6 +870,12 @@
     try {
       const roster = await api.get(`/api/teacher/roster?${query}`);
       if (seq !== state.rosterSeq) return;
+      try {
+        localStorage.setItem(`rollcall_cache_roster_${params.classId}_${params.period}_${params.date}`, JSON.stringify(roster));
+        if (roster.students && roster.students.length) {
+          localStorage.setItem(`rollcall_cache_students_${params.classId}`, JSON.stringify(roster.students));
+        }
+      } catch (_) {}
       state.roster = roster;
       state.sessionId = roster.session_id;
       state.isExisting = roster.is_existing;
@@ -740,6 +903,54 @@
       renderRoster();
     } catch (error) {
       if (seq !== state.rosterSeq) return;
+
+      // Try reading offline cached roster
+      let cachedRoster = null;
+      try {
+        const raw = localStorage.getItem(`rollcall_cache_roster_${params.classId}_${params.period}_${params.date}`);
+        if (raw) cachedRoster = JSON.parse(raw);
+      } catch (_) {}
+
+      if (!cachedRoster) {
+        try {
+          const rawStudents = localStorage.getItem(`rollcall_cache_students_${params.classId}`);
+          if (rawStudents) {
+            const studentsList = JSON.parse(rawStudents);
+            const slot = state.selected || {};
+            cachedRoster = {
+              class: { id: params.classId, name: "MCA 1st Semester", code: "MCA-1" },
+              subject: { id: params.subjectId, name: slot.subject_name || "Subject", code: slot.subject_code || "SUB" },
+              date: params.date,
+              period: params.period,
+              span: slot.span || 1,
+              period_label: slot.period_label || `Period ${params.period}`,
+              time_label: slot.time_label || "",
+              faculty: slot.faculty || "",
+              is_holiday: false,
+              is_existing: false,
+              session_id: null,
+              students: studentsList.map((s) => ({ ...s, status: "present" })),
+            };
+          }
+        } catch (_) {}
+      }
+
+      if (cachedRoster) {
+        state.roster = cachedRoster;
+        state.sessionId = cachedRoster.session_id;
+        state.isExisting = cachedRoster.is_existing;
+        state.holiday = Boolean(cachedRoster.is_holiday);
+        state.statuses = new Map(
+          cachedRoster.students.map((student) => [
+            student.id,
+            student.status === "absent" ? "absent" : "present",
+          ])
+        );
+        renderRoster();
+        toast("Roster loaded from device memory (Offline Mode) 📦", "info");
+        return;
+      }
+
       state.roster = null;
       state.holiday = false;
       $("rosterCard").dataset.state = "error";
@@ -937,6 +1148,9 @@
     setButtonLoading(button, true);
 
     try {
+      if (!navigator.onLine) {
+        throw new Error("Offline");
+      }
       const result = await api.post("/api/teacher/attendance", {
         class_id: params.classId,
         subject_id: params.subjectId,
@@ -955,7 +1169,7 @@
       renderRoster();
       setText("saveState", "Saved just now");
       $("saveState").classList.add("is-existing");
-      $("saveState").classList.remove("is-dirty", "is-holiday");
+      $("saveState").classList.remove("is-dirty", "is-holiday", "is-offline-saved");
       setText(
         "saveHelp",
         "Changes are live. Students see the updated percentage right away."
@@ -966,12 +1180,27 @@
       if (state.recordsLoaded) loadRecords({ silent: true });
       if (state.studentsLoaded) loadStudents({ silent: true });
     } catch (error) {
-      toast(error.message, "error");
-      setButtonLoading(button, false);
-      setText(
-        "saveHelp",
-        "Your changes are still here. Check the details and try saving again."
-      );
+      const isOffline = !navigator.onLine || error.message === "Offline" || error.message.includes("Could not reach") || error.message.includes("connection");
+      if (isOffline) {
+        queueOfflineAttendance(params, records);
+        state.isExisting = true;
+        state.dirty = false;
+        renderRoster();
+        setText("saveState", "Saved locally 🕒");
+        $("saveState").classList.add("is-existing", "is-offline-saved");
+        $("saveState").classList.remove("is-dirty");
+        setText(
+          "saveHelp",
+          "Saved offline in device memory! Will sync to website as soon as internet connects."
+        );
+        toast("Saved offline! Will sync automatically once internet connects 🕒", "info");
+      } else {
+        toast(error.message, "error");
+        setText(
+          "saveHelp",
+          "Your changes are still here. Check the details and try saving again."
+        );
+      }
     } finally {
       setButtonLoading(button, false);
     }
@@ -1485,7 +1714,45 @@
   });
 
   /* ---------------------------------------------------------
+     Network & Offline Event Listeners
+     --------------------------------------------------------- */
+  window.addEventListener("online", () => {
+    updateNetworkStatus();
+    toast("Connected to internet! Checking offline queue...", "info");
+    syncOfflineQueue();
+  });
+
+  window.addEventListener("offline", () => {
+    updateNetworkStatus();
+    toast("You are currently offline. You can still mark attendance!", "info");
+  });
+
+  $("manualSyncButton")?.addEventListener("click", () => {
+    syncOfflineQueue();
+  });
+
+  // Background auto-sync check every 15 seconds
+  window.setInterval(() => {
+    if (navigator.onLine && getOfflineQueue().length > 0) {
+      syncOfflineQueue();
+    }
+  }, 15000);
+
+  // Register Service Worker for offline PWA capability
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/sw.js").catch((err) => {
+        console.warn("ServiceWorker registration note:", err);
+      });
+    });
+  }
+
+  /* ---------------------------------------------------------
      Start
      --------------------------------------------------------- */
+  updateNetworkStatus();
   loadDashboard();
+  if (navigator.onLine && getOfflineQueue().length > 0) {
+    syncOfflineQueue();
+  }
 })();

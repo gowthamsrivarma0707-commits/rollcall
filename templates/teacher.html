@@ -38,6 +38,10 @@
 
       <div class="app-header__actions">
         <span class="live-pill live-pill--header"><span></span> Teacher</span>
+        <span class="network-pill is-online" id="networkPill" title="Network status">
+          <span class="network-dot" aria-hidden="true"></span>
+          <span id="networkText">Online</span>
+        </span>
         <div class="profile-chip">
           <span class="avatar avatar--teacher" id="teacherAvatar" aria-hidden="true">—</span>
           <span class="profile-chip__text">
@@ -59,6 +63,14 @@
     <span class="must-change-banner__dot" aria-hidden="true"></span>
     <span class="must-change-banner__text">You are still on your college-issued password — anyone who knows it can open your account. <a href="/change-password">Change it now →</a></span>
     <button class="must-change-banner__later" id="mustChangeLater" type="button">Later today</button>
+  </div>
+
+  <div class="offline-sync-banner" id="offlineSyncBanner" role="status" hidden>
+    <div class="offline-sync-banner__content">
+      <span class="offline-sync-banner__icon" aria-hidden="true">🕒</span>
+      <span class="offline-sync-banner__text" id="offlineSyncText">1 offline roll call saved on this device. Waiting for internet to sync.</span>
+    </div>
+    <button class="btn btn--small btn--light" id="manualSyncButton" type="button">Sync now</button>
   </div>
 
   <main class="container teacher-main">

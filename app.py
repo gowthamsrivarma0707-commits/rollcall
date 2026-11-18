@@ -1082,6 +1082,21 @@ class RollCallHandler(BaseHTTPRequestHandler):
         if path == "/sitemap.xml":
             self._serve_static("/static/sitemap.xml")
             return
+        if path == "/sw.js":
+            sw_candidate = (STATIC_DIR / "sw.js").resolve()
+            if not sw_candidate.is_file():
+                raise ApiError(404, "Service worker not found.")
+            self._send_bytes(
+                sw_candidate.read_bytes(),
+                "application/javascript; charset=utf-8",
+                200,
+                extra_headers=[
+                    ("Service-Worker-Allowed", "/"),
+                    ("Cache-Control", "no-cache"),
+                ],
+                head_only=self.command == "HEAD",
+            )
+            return
         if path.startswith("/static/"):
             self._serve_static(path)
             return
