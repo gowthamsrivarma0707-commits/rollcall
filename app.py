@@ -15,6 +15,7 @@ import json
 import mimetypes
 import os
 import re
+import shutil
 import sqlite3
 import sys
 import time
@@ -59,6 +60,11 @@ DEFAULT_DB_PATH = ROOT / "attendance.db"
 HOST = os.environ.get("ROLLCALL_HOST", "127.0.0.1")
 PORT = int(os.environ.get("ROLLCALL_PORT", "8000"))
 DB_PATH = Path(os.environ.get("ROLLCALL_DB", DEFAULT_DB_PATH))
+if os.environ.get("VERCEL") and not os.environ.get("ROLLCALL_DB"):
+    _vercel_db = Path("/tmp/attendance.db")
+    if not _vercel_db.exists() and DEFAULT_DB_PATH.exists():
+        shutil.copy2(DEFAULT_DB_PATH, _vercel_db)
+    DB_PATH = _vercel_db
 
 APP_NAME = "RollCall"
 TARGET_PERCENT = 75
@@ -857,6 +863,16 @@ class RollCallHandler(BaseHTTPRequestHandler):
             raise ApiError(400, "Invalid request body.")
         return payload
 
+    def _client_ip(self) -> str:
+        if os.environ.get("VERCEL"):
+            forwarded = (self.headers.get("X-Forwarded-For") or "").split(",", 1)[0].strip()
+            if forwarded:
+                return forwarded
+        addr = getattr(self, "client_address", None)
+        if isinstance(addr, (tuple, list)) and addr:
+            return str(addr[0])
+        return "unknown"
+
     def _check_origin(self) -> None:
         # Reject requests the browser itself labels as cross-site, even when
         # no Origin header is present.
@@ -865,8 +881,15 @@ class RollCallHandler(BaseHTTPRequestHandler):
         origin = self.headers.get("Origin")
         if not origin:
             return
-        host = self.headers.get("Host", "")
-        if urlsplit(origin).netloc.lower() != host.lower():
+        hosts = {
+            h.strip().lower()
+            for h in (
+                self.headers.get("Host", ""),
+                self.headers.get("X-Forwarded-Host", ""),
+            )
+            if h and h.strip()
+        }
+        if urlsplit(origin).netloc.lower() not in hosts:
             raise ApiError(403, "Request origin was not accepted.")
 
     def _cookie_tokens(self, role: str | None = None) -> list[str]:
@@ -1126,7 +1149,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
         if path == "/api/teacher/roster":
             session, is_admin = self._require_staff_session()
             retry = roster_limiter.hit(
-                f"roster|{self.client_address[0]}|{session['user_id']}"
+                f"roster|{self._client_ip()}|{session['user_id']}"
             )
             if retry:
                 raise ApiError(
@@ -1197,7 +1220,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
         if path == "/api/teacher/students/export":
             session, is_admin = self._require_staff_session()
             retry = export_limiter.hit(
-                f"export|{self.client_address[0]}|{session['user_id']}"
+                f"export|{self._client_ip()}|{session['user_id']}"
             )
             if retry:
                 raise ApiError(
@@ -1261,7 +1284,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
             session, is_admin = self._require_staff_session()
             payload = self._read_json()
             retry = attendance_limiter.hit(
-                f"attendance|{self.client_address[0]}|{session['user_id']}"
+                f"attendance|{self._client_ip()}|{session['user_id']}"
             )
             if retry:
                 raise ApiError(
@@ -1289,7 +1312,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
         if len(username) > 120 or len(password) > 200:
             raise ApiError(400, "The username or password is too long.")
 
-        ip_key = f"login-ip|{self.client_address[0]}"
+        ip_key = f"login-ip|{self._client_ip()}"
         ip_retry = login_ip_limiter.retry_after(ip_key)
         if ip_retry:
             raise ApiError(
@@ -1450,7 +1473,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
         payload = self._read_json()
         user_id = int(session["user_id"])
 
-        ip_key = f"change-username|{self.client_address[0]}|{role}|{user_id}"
+        ip_key = f"change-username|{self._client_ip()}|{role}|{user_id}"
         retry = password_reset_limiter.hit(ip_key)
         if retry:
             raise ApiError(
@@ -1526,7 +1549,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
         role = session["role"]
         user_id = int(session["user_id"])
 
-        ip_key = f"change-pw|{self.client_address[0]}|{role}|{user_id}"
+        ip_key = f"change-pw|{self._client_ip()}|{role}|{user_id}"
         retry = password_reset_limiter.hit(ip_key)
         if retry:
             raise ApiError(
@@ -1602,7 +1625,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
         )
         new_email = normalize_staff_email(raw_new["new_email"]) if role == "teacher" else ""
 
-        ip_key = f"reset|{self.client_address[0]}"
+        ip_key = f"reset|{self._client_ip()}"
         retry = password_reset_limiter.hit(ip_key)
         if retry:
             raise ApiError(
@@ -3537,6 +3560,14 @@ def main() -> None:
         server.serve_forever()
     except KeyboardInterrupt:
         print("\nServer stopped.")
+
+
+class handler(RollCallHandler, BaseHTTPRequestHandler):
+    """Vercel Python serverless entrypoint."""
+
+
+if os.environ.get("VERCEL"):
+    init_db()
 
 
 if __name__ == "__main__":
