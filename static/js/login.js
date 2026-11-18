@@ -177,6 +177,7 @@
         );
       } catch (_) {}
 
+      localStorage.setItem("rollcall_active_teacher_id", usernameValue.toLowerCase().trim());
       window.location.assign(data.redirect || (isTeacher ? "/teacher" : "/student"));
     } catch (error) {
       const isOffline =
@@ -215,6 +216,7 @@
           if (matched) {
             if (buttonText) buttonText.textContent = "Opening offline…";
             localStorage.setItem("rollcall_offline_session", "true");
+            localStorage.setItem("rollcall_active_teacher_id", userLower);
             window.location.assign(isTeacher ? "/teacher" : "/student");
             return;
           }

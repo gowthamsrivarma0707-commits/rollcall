@@ -176,7 +176,11 @@
     } catch {
       // The local session is still cleared on the server; continue home.
     }
-    window.location.href = "/";
+    try {
+      localStorage.removeItem("rollcall_offline_session");
+      localStorage.removeItem("rollcall_active_teacher_id");
+    } catch (_) {}
+    window.location.href = role === "teacher" ? "/teacher/login" : role === "admin" ? "/admin/login" : "/student/login";
   }
 
   document.addEventListener("click", (event) => {

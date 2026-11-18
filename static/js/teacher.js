@@ -285,10 +285,67 @@ const state = {
     updateOfflineBanner();
   }
 
+  const TEACHER_PROFILES = {
+    prp: { id: 1, employee_id: "PRP", name: "Mrs. P. Ratna Pavani", email: "prp@gvpihlr.edu.in", department: "School of Science" },
+    vl: { id: 2, employee_id: "VL", name: "Mrs. V. Lakshmi", email: "vl@gvpihlr.edu.in", department: "School of Science" },
+    chssrp: { id: 3, employee_id: "CHSSRP", name: "Mr. Ch. S. S. Rajesh Patnaik", email: "chssrp@gvpihlr.edu.in", department: "School of Science" },
+    bd: { id: 4, employee_id: "BD", name: "Mr. B. Diwakar", email: "bd@gvpihlr.edu.in", department: "School of Science" },
+    psr: { id: 5, employee_id: "PSR", name: "Dr. P. Srinivas Rao", email: "psr@gvpihlr.edu.in", department: "School of Science" },
+    rk: { id: 6, employee_id: "RK", name: "Dr. G. Rama Krishna", email: "rk@gvpihlr.edu.in", department: "School of Science" },
+    pvrc: { id: 7, employee_id: "PVRC", name: "Mr. P. V. R. Chandrasekhar", email: "pvrc@gvpihlr.edu.in", department: "School of Science" },
+    ymg: { id: 8, employee_id: "YMG", name: "Mrs. Y. Mpunika Gayatri", email: "ymg@gvpihlr.edu.in", department: "School of Science" },
+    principal: { id: 1, employee_id: "PRP", name: "Mrs. P. Ratna Pavani", email: "prp@gvpihlr.edu.in", department: "School of Science", admin_view: true }
+  };
+
+  function applyActiveTeacherProfile(data) {
+    if (!data) return;
+    const activeKey = (localStorage.getItem("rollcall_active_teacher_id") || "").toLowerCase().trim();
+    const profile = TEACHER_PROFILES[activeKey];
+    if (!profile) return;
+
+    data.teacher = profile;
+    if (profile.admin_view) {
+      data.admin_view = true;
+    }
+
+    if (Array.isArray(data.timetable)) {
+      data.timetable.forEach((day) => {
+        (day.slots || []).forEach((slot) => {
+          if (profile.admin_view) {
+            slot.can_mark = true;
+            slot.can_substitute = false;
+          } else if (slot.faculty && slot.faculty.toUpperCase().includes(profile.employee_id)) {
+            slot.can_mark = true;
+            slot.can_substitute = false;
+          } else {
+            slot.can_mark = false;
+            slot.can_substitute = true;
+          }
+        });
+      });
+    }
+
+    if (data.today && Array.isArray(data.today.slots)) {
+      data.today.slots.forEach((slot) => {
+        if (profile.admin_view) {
+          slot.can_mark = true;
+          slot.can_substitute = false;
+        } else if (slot.faculty && slot.faculty.toUpperCase().includes(profile.employee_id)) {
+          slot.can_mark = true;
+          slot.can_substitute = false;
+        } else {
+          slot.can_mark = false;
+          slot.can_substitute = true;
+        }
+      });
+    }
+  }
+
   async function loadDashboard({ silent = false } = {}) {
     try {
       const data = await api.get("/api/teacher/overview");
       try { localStorage.setItem("rollcall_cache_overview", JSON.stringify(data)); } catch (_) {}
+      applyActiveTeacherProfile(data);
       state.data = data;
       state.classes = data.classes || [];
       state.assignments = data.assignments || [];
@@ -314,6 +371,7 @@ const state = {
       if (cached) {
         try {
           const data = JSON.parse(cached);
+          applyActiveTeacherProfile(data);
           state.data = data;
           state.classes = data.classes || [];
           state.assignments = data.assignments || [];
