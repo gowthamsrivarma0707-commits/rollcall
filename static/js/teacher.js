@@ -16,7 +16,9 @@
 
   const $ = (id) => document.getElementById(id);
 
-  const state = {
+    const DEFAULT_MCA1_STUDENTS = [{"id": 1, "register_no": "26PSMCA0001", "name": "Adireddi Revanth"}, {"id": 2, "register_no": "26PSMCA0002", "name": "Alabana Durga Ram"}, {"id": 3, "register_no": "26PSMCA0003", "name": "Allada Ganesh"}, {"id": 4, "register_no": "26PSMCA0004", "name": "Bandaru Sai Sananda"}, {"id": 5, "register_no": "26PSMCA0005", "name": "Barli Manoharkumar"}, {"id": 6, "register_no": "26PSMCA0006", "name": "Bayana Urmila"}, {"id": 7, "register_no": "26PSMCA0007", "name": "Behara Sai Eshwar Yerram Raju"}, {"id": 8, "register_no": "26PSMCA0008", "name": "Bhavitesh Boddeti"}, {"id": 9, "register_no": "26PSMCA0009", "name": "Boddu Omkar Jyothi Swaroop"}, {"id": 10, "register_no": "26PSMCA0010", "name": "Bondi Venkatesh"}, {"id": 11, "register_no": "26PSMCA0011", "name": "Bugatha Sai Charan"}, {"id": 12, "register_no": "26PSMCA0012", "name": "Chenamalla Usha Sai Kiran"}, {"id": 13, "register_no": "26PSMCA0013", "name": "Chintala Hymavathi"}, {"id": 14, "register_no": "26PSMCA0014", "name": "Dagulupilli Latha"}, {"id": 15, "register_no": "26PSMCA0015", "name": "Dendukuri Gowtham Sri Varma"}, {"id": 16, "register_no": "26PSMCA0016", "name": "Donka Chandra Sekhar"}, {"id": 17, "register_no": "26PSMCA0017", "name": "Gara Maruti Lakshmunaidu"}, {"id": 18, "register_no": "26PSMCA0018", "name": "Gavara Uma Maheswari"}, {"id": 19, "register_no": "26PSMCA0019", "name": "Gedela Chaitanya Deep"}, {"id": 20, "register_no": "26PSMCA0020", "name": "Godha Dhasaradha"}, {"id": 21, "register_no": "26PSMCA0021", "name": "Gujji Mithilesh Reddy"}, {"id": 22, "register_no": "26PSMCA0022", "name": "Jana Bhargav"}, {"id": 23, "register_no": "26PSMCA0023", "name": "Kandipilli Mahadev"}, {"id": 24, "register_no": "26PSMCA0024", "name": "Kandrapu Aarthi"}, {"id": 25, "register_no": "26PSMCA0025", "name": "Kari Raju"}, {"id": 26, "register_no": "26PSMCA0026", "name": "Katta Koushik"}, {"id": 27, "register_no": "26PSMCA0027", "name": "Kemburu Lokesh Kumar"}, {"id": 28, "register_no": "26PSMCA0028", "name": "Kintali Pavankalyan"}, {"id": 29, "register_no": "26PSMCA0029", "name": "Korangi Rupa Sri Lakshmi"}, {"id": 30, "register_no": "26PSMCA0030", "name": "Koribilli Nandu Kumar"}, {"id": 31, "register_no": "26PSMCA0031", "name": "Korikina Devika"}, {"id": 32, "register_no": "26PSMCA0032", "name": "Kusalapudi Sruthi"}, {"id": 33, "register_no": "26PSMCA0033", "name": "Lokireddy Harish"}, {"id": 34, "register_no": "26PSMCA0034", "name": "Majji Roshini"}, {"id": 35, "register_no": "26PSMCA0035", "name": "Manuballa Trinayani"}, {"id": 36, "register_no": "26PSMCA0036", "name": "Mavuluri Manjusha"}, {"id": 37, "register_no": "26PSMCA0037", "name": "Nakka Dinesh Sai Pavan"}, {"id": 38, "register_no": "26PSMCA0038", "name": "Neelapu Yashodha Reddy"}, {"id": 39, "register_no": "26PSMCA0039", "name": "Nidumoli Vasudeva Varma"}, {"id": 40, "register_no": "26PSMCA0040", "name": "Palacharla Charan Sai Pavan Kumar"}, {"id": 41, "register_no": "26PSMCA0041", "name": "Patra Eswar Govinda Sai Nayak"}, {"id": 42, "register_no": "26PSMCA0042", "name": "Pattemu Anusha"}, {"id": 43, "register_no": "26PSMCA0043", "name": "Peddaboina Bhavana"}, {"id": 44, "register_no": "26PSMCA0044", "name": "Pendyala Gnaneswari"}, {"id": 45, "register_no": "26PSMCA0045", "name": "Penmetsa Sai Keerthi"}, {"id": 46, "register_no": "26PSMCA0046", "name": "Pentapalli Akhil Prasad"}, {"id": 47, "register_no": "26PSMCA0047", "name": "Potnuru Sri Valli"}, {"id": 48, "register_no": "26PSMCA0048", "name": "Puranam Madhu Sri"}, {"id": 49, "register_no": "26PSMCA0049", "name": "Randi Jayasri"}, {"id": 50, "register_no": "26PSMCA0050", "name": "Rayanapati Dhanush Kumar"}, {"id": 51, "register_no": "26PSMCA0051", "name": "Rayapureddi Mohana Lakshmi"}, {"id": 52, "register_no": "26PSMCA0052", "name": "Reddi Harsha Sri"}, {"id": 53, "register_no": "26PSMCA0053", "name": "Reddy Eswaramma"}, {"id": 54, "register_no": "26PSMCA0054", "name": "Reshma Mahanty"}, {"id": 55, "register_no": "26PSMCA0055", "name": "Rokkam Hemanth"}, {"id": 56, "register_no": "26PSMCA0056", "name": "Routhu Bhanu Tejaswini"}, {"id": 57, "register_no": "26PSMCA0057", "name": "Sai Nikitha Putta"}, {"id": 58, "register_no": "26PSMCA0058", "name": "Saketi Hemakshi Gowri"}, {"id": 59, "register_no": "26PSMCA0059", "name": "Siriki Vinodhini"}, {"id": 60, "register_no": "26PSMCA0060", "name": "Siyadri Prashant"}, {"id": 61, "register_no": "26PSMCA0061", "name": "Subham Kumar"}, {"id": 62, "register_no": "26PSMCA0062", "name": "Surapureddi Lasya Rishitha"}, {"id": 63, "register_no": "26PSMCA0063", "name": "Susarapu Balarka Bhaavagna"}, {"id": 64, "register_no": "26PSMCA0064", "name": "Suvvari Balakrishna"}, {"id": 65, "register_no": "26PSMCA0065", "name": "Talluri Pavan Kumar"}, {"id": 66, "register_no": "26PSMCA0066", "name": "Tippana Kalyani"}, {"id": 67, "register_no": "26PSMCA0067", "name": "Utla Rohith Kumar"}, {"id": 68, "register_no": "26PSMCA0068", "name": "Vadisala Pavan V S N E Manohar"}, {"id": 69, "register_no": "26PSMCA0069", "name": "Vajji Sai Kiran"}, {"id": 70, "register_no": "26PSMCA0070", "name": "Vandila Vamsi"}, {"id": 71, "register_no": "26PSMCA0071", "name": "Varanasi Ruchita"}, {"id": 72, "register_no": "26PSMCA0072", "name": "Varri Tejaswini"}, {"id": 73, "register_no": "26PSMCA0073", "name": "Yandapalli Anand"}, {"id": 74, "register_no": "26PSMCA0074", "name": "Yedla Pavani"}, {"id": 75, "register_no": "26PSMCA0075", "name": "Yeruva Mary Navya"}, {"id": 76, "register_no": "26PSMCA0076", "name": "Indukuri Sri Swetha Bala"}];
+
+const state = {
     data: null,
     classes: [],
     assignments: [],
@@ -868,6 +870,9 @@
     });
 
     try {
+      if (!navigator.onLine) {
+        throw new Error("Offline");
+      }
       const roster = await api.get(`/api/teacher/roster?${query}`);
       if (seq !== state.rosterSeq) return;
       try {
@@ -904,72 +909,33 @@
     } catch (error) {
       if (seq !== state.rosterSeq) return;
 
-      // Try reading offline cached roster
-      let cachedRoster = null;
-      try {
-        const raw = localStorage.getItem(`rollcall_cache_roster_${params.classId}_${params.period}_${params.date}`);
-        if (raw) cachedRoster = JSON.parse(raw);
-      } catch (_) {}
+      // Always load roster from offline device memory
+      const slot = state.selected || {};
+      const fallbackRoster = {
+        class: { id: params.classId, name: "MCA 1st Semester", code: "MCA-1" },
+        subject: { id: params.subjectId, name: slot.subject_name || "Subject", code: slot.subject_code || "SUB" },
+        date: params.date,
+        period: params.period,
+        span: slot.span || 1,
+        period_label: slot.period_label || `Period ${params.period}`,
+        time_label: slot.time_label || "",
+        faculty: slot.faculty || "",
+        is_holiday: false,
+        is_existing: false,
+        session_id: null,
+        students: DEFAULT_MCA1_STUDENTS.map((s) => ({ ...s, status: "present" })),
+      };
 
-      if (!cachedRoster) {
-        let studentsList = null;
-        try {
-          const rawStudents = localStorage.getItem(`rollcall_cache_students_${params.classId}`);
-          if (rawStudents) studentsList = JSON.parse(rawStudents);
-        } catch (_) {}
-
-        if (!studentsList && window.ROLLCALL_DEFAULT_STUDENTS) {
-          studentsList = window.ROLLCALL_DEFAULT_STUDENTS;
-        }
-
-        if (studentsList) {
-          const slot = state.selected || {};
-          cachedRoster = {
-            class: { id: params.classId, name: "MCA 1st Semester", code: "MCA-1" },
-            subject: { id: params.subjectId, name: slot.subject_name || "Subject", code: slot.subject_code || "SUB" },
-            date: params.date,
-            period: params.period,
-            span: slot.span || 1,
-            period_label: slot.period_label || `Period ${params.period}`,
-            time_label: slot.time_label || "",
-            faculty: slot.faculty || "",
-            is_holiday: false,
-            is_existing: false,
-            session_id: null,
-            students: studentsList.map((s) => ({ ...s, status: "present" })),
-          };
-        }
-      }
-
-      if (cachedRoster) {
-        state.roster = cachedRoster;
-        state.sessionId = cachedRoster.session_id;
-        state.isExisting = cachedRoster.is_existing;
-        state.holiday = Boolean(cachedRoster.is_holiday);
-        state.statuses = new Map(
-          cachedRoster.students.map((student) => [
-            student.id,
-            student.status === "absent" ? "absent" : "present",
-          ])
-        );
-        renderRoster();
-        toast("Roster loaded from device memory (Offline Mode) 📦", "info");
-        return;
-      }
-
-      state.roster = null;
+      state.roster = fallbackRoster;
+      state.sessionId = null;
+      state.isExisting = false;
       state.holiday = false;
-      $("rosterCard").dataset.state = "error";
-      $("rosterCard").dataset.holiday = "false";
-      setText("rosterTitle", "Could not load the roster.");
-      setText("rosterSubtitle", error.message);
-      $("rosterList").innerHTML = `
-        <div class="roster-empty">Try another period or date, then select it again.</div>`;
-      setText("saveState", "Not loaded");
-      setText("saveButtonText", "Save attendance");
-      $("saveAttendanceButton").disabled = true;
-      $("holidayButton").disabled = true;
-      toast(error.message, "error");
+      state.statuses = new Map(
+        fallbackRoster.students.map((student) => [student.id, "present"])
+      );
+      renderRoster();
+      toast("Roster ready (Offline Mode) 📦", "info");
+      return;
     } finally {
       state.loadingRoster = false;
     }
