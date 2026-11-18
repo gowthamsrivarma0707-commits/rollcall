@@ -1,6 +1,7 @@
 /* RollCall Service Worker for Offline-First Teacher Attendance */
-const CACHE_NAME = "rollcall-teacher-v5";
+const CACHE_NAME = "rollcall-teacher-v6";
 const ASSETS_TO_CACHE = [
+  "/",
   "/teacher",
   "/teacher/login",
   "/static/css/base.css",
@@ -43,13 +44,15 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
-
-  // If it's a static file or the teacher page / login, try network first, fallback to cache
-  if (
+  const isNav = request.mode === "navigate";
+  const isStatic = url.pathname.startsWith("/static/");
+  const isAppPage =
+    url.pathname === "/" ||
     url.pathname === "/teacher" ||
-    url.pathname === "/teacher/login" ||
-    url.pathname.startsWith("/static/")
-  ) {
+    url.pathname === "/teacher/login";
+
+  // Intercept all navigation requests or app assets
+  if (isNav || isStatic || isAppPage) {
     event.respondWith(
       fetch(request)
         .then((response) => {
@@ -59,16 +62,20 @@ self.addEventListener("fetch", (event) => {
           }
           return response;
         })
-        .catch(() => {
-          return caches.match(request).then((cached) => {
-            if (cached) return cached;
-            if (request.mode === "navigate") {
-              if (url.pathname === "/teacher/login") {
-                return caches.match("/teacher/login");
-              }
-              return caches.match("/teacher");
+        .catch(async () => {
+          const cache = await caches.open(CACHE_NAME);
+          const cached = await cache.match(request);
+          if (cached) return cached;
+
+          // Seamless offline navigation fallback - never show dinosaur screen
+          if (isNav) {
+            if (url.pathname.includes("login") || url.pathname === "/") {
+              const loginPage = await cache.match("/teacher/login");
+              if (loginPage) return loginPage;
             }
-          });
+            const teacherPage = await cache.match("/teacher");
+            if (teacherPage) return teacherPage;
+          }
         })
     );
   }
