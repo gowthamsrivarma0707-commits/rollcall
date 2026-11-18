@@ -188,19 +188,35 @@
       if (isOffline) {
         // Attempt offline device authentication
         try {
+          const passHash = await hashPassword(passwordValue);
+          const userLower = usernameValue.toLowerCase();
+          let matched = false;
+
+          // 1. Check if user logged in previously on this device
           const raw = localStorage.getItem(`rollcall_offline_auth_${role}`);
           if (raw) {
             const cached = JSON.parse(raw);
-            const passHash = await hashPassword(passwordValue);
             if (
-              cached.username === usernameValue.toLowerCase() &&
+              cached.username === userLower &&
               cached.passHash === passHash
             ) {
-              if (buttonText) buttonText.textContent = "Opening offline…";
-              localStorage.setItem("rollcall_offline_session", "true");
-              window.location.assign(cached.redirect || (isTeacher ? "/teacher" : "/student"));
-              return;
+              matched = true;
             }
+          }
+
+          // 2. Built-in offline support for college faculty & students
+          const DEMO_TEACHERS = new Set(["principal", "vl", "prp", "chssrp", "bd", "psr", "rk", "pvrc", "ymg"]);
+          const TEACHER_DEFAULT_HASH = "cde383eee8ee7a4400adf7a15f716f179a2eb97646b37e089eb8d6d04e663416"; // teacher123
+
+          if (!matched && isTeacher && DEMO_TEACHERS.has(userLower) && passHash === TEACHER_DEFAULT_HASH) {
+            matched = true;
+          }
+
+          if (matched) {
+            if (buttonText) buttonText.textContent = "Opening offline…";
+            localStorage.setItem("rollcall_offline_session", "true");
+            window.location.assign(isTeacher ? "/teacher" : "/student");
+            return;
           }
         } catch (_) {}
 
