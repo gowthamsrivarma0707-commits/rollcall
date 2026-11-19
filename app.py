@@ -70,9 +70,6 @@ APP_NAME = "RollCall"
 TARGET_PERCENT = 75
 SESSION_COOKIE = "rollcall_session"
 SESSION_ROLES = ("student", "teacher", "admin")
-# Portal separation for the two staff accounts: the principal signs in from
-# the teacher login, the Administrator from the admin login. Cross sign-in is
-# rejected with the generic "details do not match" error.
 PRINCIPAL_USERNAME = "principal"
 SESSION_TTL_SECONDS = 14 * 24 * 60 * 60
 MAX_BODY_BYTES = 1_000_000
@@ -303,24 +300,8 @@ def init_db(reset: bool = False) -> None:
 
             seed_database(conn)
 
-        # Ensure Administrator account is guaranteed to exist across cloud deploys
-        admin_check = conn.execute(
-            "SELECT id FROM admins WHERE username = 'Administrator' COLLATE NOCASE"
-        ).fetchone()
-        if not admin_check:
-            now_iso = datetime.now().isoformat(timespec="seconds")
-            conn.execute(
-                """
-                INSERT INTO admins (username, name, password_hash, must_change_password, created_at)
-                VALUES (?, ?, ?, 0, ?)
-                """,
-                (
-                    "Administrator",
-                    "Administrator",
-                    hash_password("admin@2026"),
-                    now_iso,
-                ),
-            )
+        # Remove deprecated Administrator account if present
+        conn.execute("DELETE FROM admins WHERE username = 'Administrator' COLLATE NOCASE")
 
 
 def _all_teachers() -> list[sqlite3.Row]:
@@ -1367,10 +1348,6 @@ class RollCallHandler(BaseHTTPRequestHandler):
                     """,
                     (username,),
                 ).fetchone()
-                if row and row["username"].lower() == PRINCIPAL_USERNAME:
-                    # The principal account signs in from the teacher login
-                    # only; reject it here like any unknown credential.
-                    row = None
             else:
                 row = conn.execute(
                     """
@@ -1391,9 +1368,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
                         """,
                         (username,),
                     ).fetchone()
-                    if admin_row and admin_row["username"].lower() == PRINCIPAL_USERNAME:
-                        # Only the principal account may enter from the teacher
-                        # login; the Administrator uses its own portal.
+                    if admin_row:
                         row = admin_row
                         role = "admin"
 

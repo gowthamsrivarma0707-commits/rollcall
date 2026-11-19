@@ -70,9 +70,8 @@ can sign in with either the employee ID or the e-mail shown in `seed_data.py`:
 | `YMG` | `ymg@gvpihlr.edu.in` | Mrs. Y. Mpunika Gayatri |
 
 The admin console is a separate portal at `/admin` and can view and update
-attendance for every teacher and subject. Staff accounts are portal-separated:
-the `principal` account signs in from `/teacher/login`, and the
-`Administrator` account signs in from `/admin/login`. Cross sign-in is rejected.
+attendance for every teacher and subject. The `principal` account signs in
+from `/admin/login` or `/teacher/login`.
 
 > **Admin credentials.** The default `principal` / `RollCall@2026` account is
 > created when a fresh database is built. Override it before any deployment:
