@@ -1,5 +1,5 @@
 /* RollCall Service Worker for Offline-First Teacher Attendance */
-const CACHE_NAME = "rollcall-teacher-v6";
+const CACHE_NAME = "rollcall-teacher-v7";
 const ASSETS_TO_CACHE = [
   "/",
   "/teacher",
