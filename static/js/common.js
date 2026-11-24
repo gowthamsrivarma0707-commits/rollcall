@@ -231,6 +231,24 @@
 
   maybeShowMustChangeBanner();
 
+  // Auto-hide top header / RollCall headline when scrolling down
+  let lastScrollY = window.scrollY || 0;
+  window.addEventListener(
+    "scroll",
+    () => {
+      const currentScrollY = window.scrollY || 0;
+      const header = document.querySelector(".app-header, .site-header");
+      if (!header) return;
+      if (currentScrollY > 40 && currentScrollY > lastScrollY) {
+        header.classList.add("header--hidden");
+      } else {
+        header.classList.remove("header--hidden");
+      }
+      lastScrollY = Math.max(0, currentScrollY);
+    },
+    { passive: true }
+  );
+
   window.RollCall = {
     api,
     toast,

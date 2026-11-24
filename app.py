@@ -3092,12 +3092,33 @@ class RollCallHandler(BaseHTTPRequestHandler):
             }
             for row in student_rows
         ]
+
+        # Ensure all assigned subjects for the class are included in order
+        with get_db() as conn:
+            assigned_rows = conn.execute(
+                """
+                SELECT DISTINCT sub.id, sub.code, sub.name
+                FROM teacher_assignments ta
+                JOIN subjects sub ON sub.id = ta.subject_id
+                WHERE ta.class_id = ?
+                ORDER BY sub.code
+                """,
+                (class_id,),
+            ).fetchall()
+
         subjects: dict[str, dict] = {}
+        for a_row in assigned_rows:
+            subjects[a_row["code"]] = {
+                "id": a_row["id"],
+                "code": a_row["code"],
+                "name": a_row["name"],
+                "sessions": [],
+            }
         for row in session_rows:
             key = row["subject_code"]
             group = subjects.setdefault(
                 key,
-                {"code": row["subject_code"], "name": row["subject_name"], "sessions": []},
+                {"id": row["subject_id"], "code": row["subject_code"], "name": row["subject_name"], "sessions": []},
             )
             group["sessions"].append(row)
         subject_list = [subjects[key] for key in sorted(subjects)]
@@ -3105,38 +3126,40 @@ class RollCallHandler(BaseHTTPRequestHandler):
         # ---------------- workbook styling helpers ----------------
         DARK, GREEN, SOFT, SAND = "123C2E", "1D6A4C", "E4F2E9", "F4F1E9"
         CREAM, LOW = "FAF9F4", "FBE4E4"
-        thin = Side(style="thin", color="D9D5C9")
-        box = Border(left=thin, right=thin, top=thin, bottom=thin)
+        LIGHT_BLUE, DARK_RED, ALERT_RED, YELLOW_FILL = "D9E1F2", "990000", "CC0000", "FFFF99"
+        thin_gray = Side(style="thin", color="D9D5C9")
+        thin_black = Side(style="thin", color="000000")
+        box = Border(left=thin_gray, right=thin_gray, top=thin_gray, bottom=thin_gray)
+        full_box = Border(left=thin_black, right=thin_black, top=thin_black, bottom=thin_black)
         header_fill = PatternFill("solid", fgColor=DARK)
         span_fill = PatternFill("solid", fgColor=SAND)
         alt_fill = PatternFill("solid", fgColor=CREAM)
         low_fill = PatternFill("solid", fgColor=LOW)
+        blue_fill = PatternFill("solid", fgColor=LIGHT_BLUE)
+        maroon_fill = PatternFill("solid", fgColor=DARK_RED)
         white_bold = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
 
         def title_block(ws, end_col: int, lines: list[str]) -> None:
-            end_ref = get_column_letter(end_col)
             for index, line in enumerate(lines, start=1):
                 ws.merge_cells(start_row=index, start_column=1, end_row=index, end_column=end_col)
                 cell = ws.cell(row=index, column=1, value=line)
-                cell.alignment = Alignment(vertical="center")
+                cell.alignment = Alignment(horizontal="center", vertical="center")
                 if index == 1:
-                    cell.font = Font(name="Calibri", size=15, bold=True, color=DARK)
-                elif index == 2:
-                    cell.font = Font(name="Calibri", size=11, bold=True, color=GREEN)
+                    cell.font = Font(name="Calibri", size=13, bold=True, color="000000")
+                elif index in (2, 3):
+                    cell.font = Font(name="Calibri", size=11, bold=True, color="000000")
                 else:
-                    cell.font = Font(name="Calibri", size=8.5, italic=True, color="68766D")
-                ws.row_dimensions[index].height = {1: 26, 2: 20}.get(index, 17)
+                    cell.font = Font(name="Calibri", size=11, bold=True, color="000000")
+                ws.row_dimensions[index].height = 20
                 ws.freeze_panes = None
-            ws.row_dimensions[4].height = 6
+            ws.row_dimensions[5].height = 6
 
         def style_sheet(ws, header_row: int, first_col: int, last_col: int, last_row: int) -> None:
-            ws.sheet_view.showGridLines = False
-            ws.freeze_panes = f"C{header_row + 1}"
+            ws.sheet_view.showGridLines = True
+            ws.freeze_panes = f"D{header_row + 1}"
             ws.auto_filter.ref = (
                 f"A{header_row}:{get_column_letter(last_col)}{last_row}"
             )
-            for column in range(first_col, last_col + 1):
-                ws.column_dimensions[get_column_letter(column)].width = 12
             ws.page_setup.orientation = "landscape"
             ws.page_setup.paperSize = 5  # legal
             ws.page_setup.fitToWidth = 1
@@ -3151,92 +3174,198 @@ class RollCallHandler(BaseHTTPRequestHandler):
 
         wb = Workbook()
 
-        # ---------------- summary sheet ----------------
+        # ==============================================================
+        # 1. CONSOLIDATED ATTENDANCE REPORT (Official College Format)
+        # ==============================================================
         ws = wb.active
-        ws.title = "Summary"
-        end_col = 7
-        title_block(
-            ws,
-            end_col,
-            [
-                f"RollCall · {class_row['name']}",
-                f"Monthly attendance report · {month_label}",
-                f"{COLLEGE_SHORT} · {class_row['code']} · Generated {today.isoformat()} · "
-                "Period-weighted (lab = 2, CTV = 3) · Holidays excluded",
-            ],
-        )
-        headers = ["#", "Register No", "Student Name", "Attended", "Total", "Attendance %", "Requirement"]
-        header_row = 5
-        for col, label in enumerate(headers, start=1):
-            cell = ws.cell(row=header_row, column=col, value=label)
-            cell.font = white_bold
-            cell.fill = header_fill
-            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-            cell.border = box
-        ws.row_dimensions[header_row].height = 22
+        ws.title = "Consolidated Report"
 
-        span_by_session = {
-            int(row["id"]): int(row["span"]) for row in session_rows
-        }
-        total_periods = sum(span_by_session.values())
-        first_student_row = header_row + 1
-        for index, student in enumerate(students):
-            attended = 0
-            for session_id, span in span_by_session.items():
-                if records.get(session_id, {}).get(student["id"]) == "present":
-                    attended += span
-            detail = guidance(attended, total_periods)
-            row_idx = first_student_row + index
-            values = [
-                index + 1,
-                student["register_no"],
-                student["name"],
-                detail["attended"],
-                detail["total"],
-                None,
-                detail["status"] == "no_data"
-                and "No data"
-                or ("On track" if detail["status"] == "on_track" else f"Needs {detail['must_attend']} more"),
-            ]
-            for col, value in enumerate(values, start=1):
-                cell = ws.cell(row=row_idx, column=col, value=value)
-                cell.border = box
-                if col == 1:
-                    cell.alignment = Alignment(horizontal="center")
-                elif col == 2:
-                    cell.alignment = Alignment(horizontal="left")
-                    cell.font = Font(name="Calibri", size=9, bold=True, color=DARK)
-                elif col == 3:
-                    cell.alignment = Alignment(horizontal="left")
-                elif col in (4, 5):
-                    cell.alignment = Alignment(horizontal="center")
-                    cell.number_format = "0"
-                elif col == 6:
-                    cell.value = f'=IF(E{row_idx}=0,0,ROUND(D{row_idx}/E{row_idx}*100,1))'
-                    cell.alignment = Alignment(horizontal="center")
-                    cell.number_format = '0.0"%"'
-                elif col == 7:
-                    cell.alignment = Alignment(horizontal="center")
-            pct_cell = ws.cell(row=row_idx, column=6)
-            req_cell = ws.cell(row=row_idx, column=7)
-            if detail["total"] > 0 and detail["status"] == "below":
-                ws.cell(row=row_idx, column=3).font = Font(name="Calibri", size=9, bold=True, color="B84A38")
-                pct_cell.font = Font(name="Calibri", size=9, bold=True, color="B84A38")
-                req_cell.font = Font(name="Calibri", size=8.5, bold=True, color="B84A38")
-                req_cell.fill = low_fill
-            elif detail["total"] > 0:
-                pct_cell.font = Font(name="Calibri", size=9, bold=True, color=GREEN)
-                req_cell.font = Font(name="Calibri", size=8.5, bold=True, color=GREEN)
+        # Number of subjects determines column layout
+        num_subjects = max(1, len(subject_list))
+        first_sub_col = 4
+        last_sub_col = first_sub_col + num_subjects - 1
+        held_col = last_sub_col + 1
+        att_col = held_col + 1
+        pct_col = att_col + 1
+        end_col = pct_col
+
+        # College title lines matching the official register
+        month_upper = month_label.upper().replace(" ", "-")
+        college_lines = [
+            "Gayatri Vidya Parishad College for Degree and PG Courses(A)",
+            "Rushikonda, Visakhapatnam -530045",
+            f"Master of Computer Applications - {class_row.get('name', 'MCA 1st Semester')}",
+            f"Consolidated Attendance Report {month_upper}",
+        ]
+        title_block(ws, end_col, college_lines)
+
+        # Header rows 6 & 7: Merged table headers with soft blue background
+        for col, label in [(1, "S.No"), (2, "Regd Number"), (3, "Name/No.of Classes")]:
+            ws.merge_cells(start_row=6, start_column=col, end_row=7, end_column=col)
+            cell = ws.cell(row=6, column=col, value=label)
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            cell.font = Font(name="Calibri", size=10, bold=True)
+            cell.fill = blue_fill
+            for r in (6, 7):
+                ws.cell(row=r, column=col).border = full_box
+
+        # "Subject Name and Number of Periods" banner over all subjects
+        ws.merge_cells(start_row=6, start_column=first_sub_col, end_row=6, end_column=last_sub_col)
+        banner_cell = ws.cell(row=6, column=first_sub_col, value="Subject Name and Number of Periods")
+        banner_cell.alignment = Alignment(horizontal="center", vertical="center")
+        banner_cell.font = Font(name="Calibri", size=10, bold=True)
+        banner_cell.fill = blue_fill
+        for c in range(first_sub_col, last_sub_col + 1):
+            ws.cell(row=6, column=c).border = full_box
+            ws.cell(row=6, column=c).fill = blue_fill
+
+        # Row 7: Subject Codes
+        for idx, sub in enumerate(subject_list):
+            col = first_sub_col + idx
+            cell = ws.cell(row=7, column=col, value=sub["code"])
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.font = Font(name="Calibri", size=9.5, bold=True)
+            cell.fill = blue_fill
+            cell.border = full_box
+
+        # Summary columns (Merged 6 & 7)
+        for col, label in [(held_col, "Total Classes Held"), (att_col, "Total Classes Attended"), (pct_col, "PERCENTAGE")]:
+            ws.merge_cells(start_row=6, start_column=col, end_row=7, end_column=col)
+            cell = ws.cell(row=6, column=col, value=label)
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            cell.font = Font(name="Calibri", size=10, bold=True)
+            cell.fill = blue_fill
+            for r in (6, 7):
+                ws.cell(row=r, column=col).border = full_box
+
+        ws.row_dimensions[6].height = 22
+        ws.row_dimensions[7].height = 20
+
+        # Row 8: Maroon subheader row with Classes Held counts
+        for c, text in [(1, "S.No"), (2, "Regd Number"), (3, "Name/No.of Classes")]:
+            cell = ws.cell(row=8, column=c, value=text)
+            cell.font = white_bold
+            cell.fill = maroon_fill
+            cell.border = full_box
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        subject_held_counts: list[int] = []
+        for idx, sub in enumerate(subject_list):
+            col = first_sub_col + idx
+            held = sum(int(s["span"]) for s in sub["sessions"])
+            subject_held_counts.append(held)
+            cell = ws.cell(row=8, column=col, value=held)
+            cell.font = white_bold
+            cell.fill = maroon_fill
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.border = full_box
+
+        total_held_all = sum(subject_held_counts)
+        cell_held_total = ws.cell(row=8, column=held_col, value="Held" if total_held_all == 0 else total_held_all)
+        cell_held_total.font = white_bold
+        cell_held_total.fill = maroon_fill
+        cell_held_total.alignment = Alignment(horizontal="center", vertical="center")
+        cell_held_total.border = full_box
+
+        cell_att_label = ws.cell(row=8, column=att_col, value="Attended")
+        cell_att_label.font = white_bold
+        cell_att_label.fill = maroon_fill
+        cell_att_label.alignment = Alignment(horizontal="center", vertical="center")
+        cell_att_label.border = full_box
+
+        cell_pct_label = ws.cell(row=8, column=pct_col, value="%")
+        cell_pct_label.font = white_bold
+        cell_pct_label.fill = maroon_fill
+        cell_pct_label.alignment = Alignment(horizontal="center", vertical="center")
+        cell_pct_label.border = full_box
+
+        ws.row_dimensions[8].height = 22
+
+        # Student data rows starting from row 9
+        start_student_row = 9
+        for idx, student in enumerate(students):
+            r_idx = start_student_row + idx
+            s_no = idx + 1
+            reg_no = student["register_no"]
+            name = student["name"]
+
+            # Calculate total attended and per-subject attendance
+            total_student_att = 0
+            student_att_by_sub: list[int] = []
+            for sub in subject_list:
+                sub_att = 0
+                for s in sub["sessions"]:
+                    if records.get(int(s["id"]), {}).get(student["id"]) == "present":
+                        sub_att += int(s["span"])
+                student_att_by_sub.append(sub_att)
+                total_student_att += sub_att
+
+            pct_val = (total_student_att / total_held_all * 100) if total_held_all > 0 else 0
+            is_shortage = (total_held_all > 0 and pct_val < 75.0)
+
+            # Col 1: S.No
+            c_sno = ws.cell(row=r_idx, column=1, value=s_no)
+            c_sno.alignment = Alignment(horizontal="center", vertical="center")
+            c_sno.border = full_box
+            c_sno.font = Font(name="Calibri", size=10)
+
+            # Col 2: Regd Number (HIGHLIGHT ROLL NUMBER IN YELLOW IF SHORTAGE!)
+            c_reg = ws.cell(row=r_idx, column=2, value=reg_no)
+            c_reg.alignment = Alignment(horizontal="center", vertical="center")
+            c_reg.border = full_box
+            if is_shortage:
+                # Highlight Roll number with bright yellow fill and bold warning text
+                c_reg.fill = PatternFill("solid", fgColor=YELLOW_FILL)
+                c_reg.font = Font(name="Calibri", size=10, bold=True, color="B84A38")
             else:
-                pct_cell.font = Font(name="Calibri", size=9, color="8B8577")
-                req_cell.font = Font(name="Calibri", size=8.5, color="8B8577")
-            if index % 2 == 1:
-                for col in range(1, end_col + 1):
-                    cell = ws.cell(row=row_idx, column=col)
-                    if cell.fill.fill_type is None:
-                        cell.fill = alt_fill
-            ws.row_dimensions[row_idx].height = 18
-        summary_last = first_student_row + len(students) - 1
+                c_reg.font = Font(name="Calibri", size=10, bold=True, color="000000")
+
+            # Col 3: Student Name (Normal, clean, UNHIGHLIGHTED as requested!)
+            c_name = ws.cell(row=r_idx, column=3, value=name)
+            c_name.alignment = Alignment(horizontal="left", vertical="center")
+            c_name.font = Font(name="Calibri", size=10, bold=False, color="000000")
+            c_name.border = full_box
+
+            # Subjects attendance columns
+            for sub_idx, sub_att in enumerate(student_att_by_sub):
+                col = first_sub_col + sub_idx
+                c_sub = ws.cell(row=r_idx, column=col, value=sub_att)
+                c_sub.alignment = Alignment(horizontal="center", vertical="center")
+                c_sub.font = Font(name="Calibri", size=10)
+                c_sub.border = full_box
+
+            # Total Classes Held
+            c_held = ws.cell(row=r_idx, column=held_col, value=total_held_all)
+            c_held.alignment = Alignment(horizontal="center", vertical="center")
+            c_held.font = Font(name="Calibri", size=10, bold=True)
+            c_held.border = full_box
+
+            # Total Classes Attended formula: =SUM(first_sub_col..last_sub_col)
+            first_col_letter = get_column_letter(first_sub_col)
+            last_col_letter = get_column_letter(last_sub_col)
+            c_att = ws.cell(row=r_idx, column=att_col, value=f"=SUM({first_col_letter}{r_idx}:{last_col_letter}{r_idx})")
+            c_att.alignment = Alignment(horizontal="center", vertical="center")
+            c_att.font = Font(name="Calibri", size=10, bold=True)
+            c_att.border = full_box
+
+            # PERCENTAGE formula
+            held_col_letter = get_column_letter(held_col)
+            att_col_letter = get_column_letter(att_col)
+            c_pct = ws.cell(row=r_idx, column=pct_col, value=f"=IF({held_col_letter}{r_idx}=0,0,ROUND({att_col_letter}{r_idx}/{held_col_letter}{r_idx}*100,1))")
+            c_pct.alignment = Alignment(horizontal="center", vertical="center")
+            c_pct.border = full_box
+            if is_shortage:
+                # Red highlight for shortage percentage like the photo!
+                c_pct.fill = PatternFill("solid", fgColor="FFD8D8")
+                c_pct.font = Font(name="Calibri", size=10, bold=True, color="CC0000")
+            elif total_held_all > 0:
+                c_pct.font = Font(name="Calibri", size=10, bold=True, color="1D6A4C")
+            else:
+                c_pct.font = Font(name="Calibri", size=10, color="595959")
+
+            ws.row_dimensions[r_idx].height = 19
+
+        summary_last = start_student_row + len(students) - 1
         if students:
             total_row = summary_last + 1
             ws.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=3)
@@ -3244,40 +3373,60 @@ class RollCallHandler(BaseHTTPRequestHandler):
             cell.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
             cell.fill = header_fill
             cell.alignment = Alignment(horizontal="left", vertical="center")
-            for col, letter in zip((4, 5), ("D", "E"), strict=False):
-                ws.cell(row=total_row, column=col, value=f"=SUM({letter}{first_student_row}:{letter}{summary_last})").number_format = "0"
-            pct_cell = ws.cell(
-                row=total_row,
-                column=6,
-                value=f"=IF(E{total_row}=0,0,ROUND(D{total_row}/E{total_row}*100,1))",
-            )
-            pct_cell.number_format = '0.0"%"'
-            ws.cell(row=total_row, column=7, value="Class average")
-            for col in range(1, end_col + 1):
-                cell = ws.cell(row=total_row, column=col)
-                if cell.fill.fill_type is None:
-                    cell.fill = header_fill
-                cell.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
-                cell.border = box
-                cell.alignment = Alignment(horizontal="center", vertical="center")
-            ws.cell(row=total_row, column=1).alignment = Alignment(horizontal="left", vertical="center")
-            ws.row_dimensions[total_row].height = 20
-        note_row = summary_last + 3
+            for c in range(1, 4):
+                ws.cell(row=total_row, column=c).border = full_box
+                ws.cell(row=total_row, column=c).fill = header_fill
+
+            for idx in range(num_subjects):
+                col = first_sub_col + idx
+                col_let = get_column_letter(col)
+                c_tot = ws.cell(row=total_row, column=col, value=f"=SUM({col_let}{start_student_row}:{col_let}{summary_last})")
+                c_tot.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+                c_tot.fill = header_fill
+                c_tot.alignment = Alignment(horizontal="center", vertical="center")
+                c_tot.border = full_box
+
+            held_let = get_column_letter(held_col)
+            c_held_tot = ws.cell(row=total_row, column=held_col, value=f"=SUM({held_let}{start_student_row}:{held_let}{summary_last})")
+            c_held_tot.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+            c_held_tot.fill = header_fill
+            c_held_tot.alignment = Alignment(horizontal="center", vertical="center")
+            c_held_tot.border = full_box
+
+            att_let = get_column_letter(att_col)
+            c_att_tot = ws.cell(row=total_row, column=att_col, value=f"=SUM({att_let}{start_student_row}:{att_let}{summary_last})")
+            c_att_tot.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+            c_att_tot.fill = header_fill
+            c_att_tot.alignment = Alignment(horizontal="center", vertical="center")
+            c_att_tot.border = full_box
+
+            pct_let = get_column_letter(pct_col)
+            c_pct_tot = ws.cell(row=total_row, column=pct_col, value=f"=IF({held_let}{total_row}=0,0,ROUND({att_let}{total_row}/{held_let}{total_row}*100,1))")
+            c_pct_tot.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+            c_pct_tot.fill = header_fill
+            c_pct_tot.alignment = Alignment(horizontal="center", vertical="center")
+            c_pct_tot.border = full_box
+
+            ws.row_dimensions[total_row].height = 22
+
+        note_row = (summary_last if students else 8) + 3
         ws.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=end_col)
         ws.cell(
             row=note_row,
             column=1,
-            value="1 = present, 0 = absent on subject sheets · Labs count as 2 periods and CTV as 3 · "
-            "Attendance % is period-weighted · Holidays are excluded",
-        ).font = Font(name="Calibri", size=8, italic=True, color="68766D")
+            value="* Roll numbers highlighted in yellow indicate attendance shortage (< 75%) · "
+            "Labs count as 2 periods and CTV as 3 · Holidays are excluded",
+        ).font = Font(name="Calibri", size=8.5, italic=True, color="68766D")
+
         ws.column_dimensions["A"].width = 6
-        ws.column_dimensions["B"].width = 18
-        ws.column_dimensions["C"].width = 40
-        ws.column_dimensions["D"].width = 13
-        ws.column_dimensions["E"].width = 13
-        ws.column_dimensions["F"].width = 16
-        ws.column_dimensions["G"].width = 20
-        style_sheet(ws, header_row, 1, end_col, summary_last)
+        ws.column_dimensions["B"].width = 16
+        ws.column_dimensions["C"].width = 34
+        for c in range(first_sub_col, last_sub_col + 1):
+            ws.column_dimensions[get_column_letter(c)].width = 9.5
+        ws.column_dimensions[get_column_letter(held_col)].width = 13
+        ws.column_dimensions[get_column_letter(att_col)].width = 13
+        ws.column_dimensions[get_column_letter(pct_col)].width = 13
+        style_sheet(ws, 8, 1, end_col, summary_last if students else 8)
 
         # ---------------- per-subject sheets ----------------
         for subject in subject_list:
@@ -3375,13 +3524,24 @@ class RollCallHandler(BaseHTTPRequestHandler):
             first_student_row = teacher_row + 1
             session_start_col = 4
             session_end_col = 3 + session_count
+            sub_total_held = sum(int(s["span"]) for s in sessions)
             for index, student in enumerate(students):
                 row_idx = first_student_row + index
+                sub_att = sum(int(s["span"]) for s in sessions if records.get(int(s["id"]), {}).get(student["id"]) == "present")
+                sub_is_shortage = (sub_total_held > 0 and (sub_att / sub_total_held) < 0.75)
+
                 ws.cell(row=row_idx, column=1, value=index + 1).alignment = Alignment(horizontal="center")
-                ws.cell(row=row_idx, column=2, value=student["register_no"]).font = Font(
-                    name="Calibri", size=9, bold=True, color=DARK
-                )
-                ws.cell(row=row_idx, column=3, value=student["name"])
+
+                c_reg = ws.cell(row=row_idx, column=2, value=student["register_no"])
+                c_reg.alignment = Alignment(horizontal="center", vertical="center")
+                if sub_is_shortage:
+                    c_reg.fill = PatternFill("solid", fgColor=YELLOW_FILL)
+                    c_reg.font = Font(name="Calibri", size=9.5, bold=True, color="B84A38")
+                else:
+                    c_reg.font = Font(name="Calibri", size=9.5, bold=True, color="000000")
+
+                c_name = ws.cell(row=row_idx, column=3, value=student["name"])
+                c_name.font = Font(name="Calibri", size=9.5, bold=False, color="000000")
                 for offset, session in enumerate(sessions):
                     value = records.get(int(session["id"]), {}).get(student["id"])
                     cell = ws.cell(
@@ -3408,6 +3568,13 @@ class RollCallHandler(BaseHTTPRequestHandler):
                     value=f"=IF({get_column_letter(total_col)}{row_idx}=0,0,ROUND({attended_letter}{row_idx}/{get_column_letter(total_col)}{row_idx}*100,1))",
                 )
                 pct_cell.number_format = '0.0"%"'
+                if sub_is_shortage:
+                    pct_cell.fill = PatternFill("solid", fgColor="FFD8D8")
+                    pct_cell.font = Font(name="Calibri", size=9.5, bold=True, color="CC0000")
+                elif sub_total_held > 0:
+                    pct_cell.font = Font(name="Calibri", size=9.5, bold=True, color="1D6A4C")
+                else:
+                    pct_cell.font = Font(name="Calibri", size=9.5, color="595959")
                 for col in (attended_col, total_col, pct_col):
                     ws.cell(row=row_idx, column=col).alignment = Alignment(horizontal="center")
                     ws.cell(row=row_idx, column=col).border = box

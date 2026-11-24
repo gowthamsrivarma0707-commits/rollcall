@@ -38,7 +38,7 @@
   align-items: center;
   gap: 30px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14.5px;
   font-weight: 650;
 }
 
@@ -110,7 +110,7 @@
   max-width: 550px;
   margin-bottom: 32px;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 16.5px;
   line-height: 1.75;
 }
 
@@ -129,13 +129,13 @@
 
 .hero__note p {
   color: var(--muted);
-  font-size: 10.5px;
+  font-size: 13.5px;
   line-height: 1.55;
 }
 
 .hero__note p strong {
   color: var(--ink-soft);
-  font-size: 11.5px;
+  font-size: 14px;
   font-weight: 750;
 }
 
@@ -186,14 +186,14 @@
   display: block;
   margin-bottom: 4px;
   color: rgba(255, 255, 255, 0.46);
-  font-size: 8.5px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.16em;
 }
 
 .preview-name {
   color: rgba(255, 255, 255, 0.9);
-  font-size: 12px;
+  font-size: 14.5px;
   font-weight: 650;
 }
 
@@ -229,7 +229,7 @@
 
 .ring--preview .ring__inner > span {
   max-width: 86px;
-  font-size: 8px;
+  font-size: 12px;
   line-height: 1.45;
 }
 
@@ -253,7 +253,7 @@
 
 .preview-status p {
   color: rgba(255, 255, 255, 0.48);
-  font-size: 10.5px;
+  font-size: 13.5px;
 }
 
 .preview-insight {
@@ -284,7 +284,7 @@
 .preview-insight span {
   display: block;
   color: rgba(255, 255, 255, 0.45);
-  font-size: 7.5px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.12em;
 }
@@ -303,7 +303,7 @@
 .preview-insight__fine {
   margin-left: auto;
   color: rgba(255, 255, 255, 0.38) !important;
-  font-size: 8.5px !important;
+  font-size: 12px !important;
   font-weight: 600 !important;
   letter-spacing: 0 !important;
   text-align: right;
@@ -321,13 +321,13 @@
   align-items: center;
   gap: 10px;
   color: rgba(255, 255, 255, 0.47);
-  font-size: 9px;
+  font-size: 13px;
   font-weight: 600;
 }
 
 .preview-subject strong {
   color: rgba(255, 255, 255, 0.8);
-  font-size: 9px;
+  font-size: 13px;
   font-weight: 700;
   text-align: right;
 }
@@ -400,7 +400,7 @@
 .teacher-float__head strong {
   display: block;
   color: var(--ink);
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 750;
 }
 
@@ -408,7 +408,7 @@
   display: block;
   margin-top: 1px;
   color: var(--muted-light);
-  font-size: 8.5px;
+  font-size: 12px;
 }
 
 .teacher-float__counts {
@@ -417,7 +417,7 @@
   gap: 11px;
   padding-top: 11px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 13px;
 }
 
 .teacher-float__counts b {
@@ -428,7 +428,7 @@
 .teacher-float__time {
   margin-left: auto;
   color: var(--muted-light);
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .threshold-float {
@@ -457,7 +457,7 @@
 
 .threshold-float > span:last-child {
   max-width: 50px;
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.04em;
   line-height: 1.25;
@@ -521,7 +521,7 @@
   max-width: 460px;
   justify-self: end;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.7;
 }
 
@@ -659,7 +659,7 @@
   max-width: 445px;
   margin-bottom: 24px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.7;
 }
 
@@ -674,7 +674,7 @@
   padding: 0;
   list-style: none;
   color: var(--ink-soft);
-  font-size: 11.5px;
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -693,7 +693,7 @@
   border-radius: 50%;
   background: var(--green-soft);
   color: var(--green);
-  font-size: 9px;
+  font-size: 13px;
   font-weight: 800;
 }
 
@@ -712,7 +712,7 @@
   gap: 8px;
   margin-top: auto;
   color: var(--green);
-  font-size: 12.5px;
+  font-size: 14.5px;
   font-weight: 800;
 }
 
@@ -823,7 +823,7 @@
   grid-row: 2;
   margin-top: 3px;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 14.5px;
   line-height: 1.7;
 }
 
@@ -892,7 +892,7 @@
   padding: 38px max(32px, calc((100vw - 1220px) / 2));
   background: var(--green-dark);
   color: rgba(255, 255, 255, 0.48);
-  font-size: 10.5px;
+  font-size: 13.5px;
 }
 
 .site-footer .brand {
@@ -908,7 +908,7 @@
 .site-footer__links {
   display: flex;
   gap: 24px;
-  font-size: 10.5px;
+  font-size: 13.5px;
   font-weight: 650;
 }
 
@@ -1052,7 +1052,7 @@
   }
 
   .hero__lede {
-    font-size: 13.5px;
+    font-size: 15px;
     line-height: 1.7;
   }
 

@@ -22,6 +22,12 @@
   backdrop-filter: blur(22px) saturate(1.3) brightness(1.03);
   -webkit-backdrop-filter: blur(22px) saturate(1.3) brightness(1.03);
   box-shadow: 0 10px 30px -18px rgba(0, 45, 90, 0.45), inset 0 -1px 1px rgba(255, 255, 255, 0.65);
+  transition: transform 0.28s cubic-bezier(0.2, 0.7, 0.2, 1), opacity 0.22s ease;
+  will-change: transform;
+}
+
+.app-header.header--hidden {
+  transform: translateY(-100%) !important;
 }
 
 .app-header__inner {
@@ -51,7 +57,7 @@
   border-radius: 999px;
   background: rgba(255, 254, 250, 0.65);
   color: var(--muted);
-  font-size: 9.5px;
+  font-size: 13px;
   font-weight: 800;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -90,7 +96,7 @@
   max-width: 150px;
   overflow: hidden;
   color: var(--ink);
-  font-size: 10.5px;
+  font-size: 13.5px;
   font-weight: 750;
   line-height: 1.3;
   text-overflow: ellipsis;
@@ -103,7 +109,7 @@
   margin-top: 1px;
   overflow: hidden;
   color: var(--muted-light);
-  font-size: 8.5px;
+  font-size: 12px;
   line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -128,7 +134,7 @@
 
 .welcome-row .eyebrow {
   margin-bottom: 8px;
-  font-size: 9.5px;
+  font-size: 13px;
 }
 
 .welcome-row h1 {
@@ -146,7 +152,7 @@
   align-items: center;
   gap: 8px;
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: 14px;
 }
 
 .updated-at {
@@ -154,7 +160,7 @@
   align-items: center;
   gap: 6px;
   color: var(--muted-light);
-  font-size: 9.5px;
+  font-size: 13px;
 }
 
 .updated-at::before {
@@ -194,7 +200,7 @@
 .welcome-badge strong {
   display: block;
   color: var(--ink-soft);
-  font-size: 10.5px;
+  font-size: 13.5px;
   font-weight: 750;
 }
 
@@ -202,7 +208,7 @@
   display: block;
   margin-top: 1px;
   color: var(--muted-light);
-  font-size: 8.5px;
+  font-size: 12px;
 }
 
 .inline-alert[hidden] {
@@ -295,12 +301,12 @@
 }
 
 .ring--hero .ring__inner > span {
-  font-size: 8.5px;
+  font-size: 12px;
 }
 
 .ring--hero .ring__caption {
   color: rgba(255, 255, 255, 0.43);
-  font-size: 8px;
+  font-size: 12px;
   letter-spacing: 0.15em;
 }
 
@@ -309,7 +315,7 @@
   align-items: center;
   gap: 7px;
   color: rgba(255, 255, 255, 0.42);
-  font-size: 8.5px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -343,7 +349,7 @@
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.7);
-  font-size: 9.5px;
+  font-size: 13px;
   font-weight: 800;
   letter-spacing: 0.05em;
   line-height: 1.2;
@@ -373,7 +379,7 @@
   align-items: center;
   gap: 7px;
   color: rgba(255, 255, 255, 0.36);
-  font-size: 8.5px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -397,7 +403,7 @@
 .hero-copy {
   max-width: 570px;
   color: rgba(255, 255, 255, 0.51);
-  font-size: 12.5px;
+  font-size: 14.5px;
   line-height: 1.65;
 }
 
@@ -436,7 +442,7 @@
   display: block;
   margin-top: 4px;
   color: rgba(255, 255, 255, 0.38);
-  font-size: 8.5px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1.3;
 }
@@ -447,7 +453,7 @@
   gap: 6px;
   margin-top: 17px;
   color: rgba(255, 255, 255, 0.3);
-  font-size: 8.5px;
+  font-size: 12px;
 }
 
 .hero-footnote svg {
@@ -498,7 +504,7 @@
 
 .guide-card__head .eyebrow {
   margin: 0;
-  font-size: 9px;
+  font-size: 13px;
 }
 
 .guide-icon {
@@ -523,7 +529,7 @@
   border-radius: 999px;
   background: var(--surface-2);
   color: var(--muted-light);
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.04em;
   line-height: 1.3;
@@ -548,7 +554,7 @@
 
 .guide-number span {
   color: var(--muted-light);
-  font-size: 10px;
+  font-size: 13.5px;
   font-weight: 750;
 }
 
@@ -556,7 +562,7 @@
   max-width: 410px;
   margin-bottom: 22px;
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: 14px;
   line-height: 1.65;
 }
 
@@ -569,7 +575,7 @@
   padding-top: 13px;
   border-top: 1px solid rgba(21, 38, 30, 0.08);
   color: var(--muted-light);
-  font-size: 8.5px;
+  font-size: 12px;
 }
 
 .guide-foot b {
@@ -582,7 +588,7 @@
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.42);
   color: var(--muted);
-  font-size: 7.5px;
+  font-size: 11px;
   font-weight: 750;
   white-space: nowrap;
 }
@@ -644,7 +650,7 @@
   gap: 8px;
   margin: 14px 4px 40px;
   color: var(--muted-light);
-  font-size: 9.5px;
+  font-size: 13px;
   line-height: 1.55;
 }
 
@@ -658,7 +664,7 @@
   border: 1px solid var(--line-strong);
   border-radius: 50%;
   font-family: var(--font-display);
-  font-size: 9px;
+  font-size: 13px;
   line-height: 1;
 }
 
@@ -712,7 +718,7 @@
   border-radius: 5px;
   background: var(--surface-2);
   color: var(--muted);
-  font-size: 7.5px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.05em;
 }
@@ -721,7 +727,7 @@
   display: block;
   overflow: hidden;
   color: var(--ink-soft);
-  font-size: 11.5px;
+  font-size: 14px;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -731,7 +737,7 @@
   display: block;
   margin-top: 2px;
   color: var(--muted-light);
-  font-size: 8.5px;
+  font-size: 12px;
 }
 
 .subject-value {
@@ -743,7 +749,7 @@
 
 .subject-value > strong {
   color: var(--ink);
-  font-size: 12px;
+  font-size: 14.5px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
@@ -753,7 +759,7 @@
   border-radius: 999px;
   background: var(--green-soft);
   color: var(--green);
-  font-size: 7px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.03em;
   text-transform: uppercase;
@@ -801,7 +807,7 @@
   gap: 12px;
   margin-top: 7px;
   color: var(--muted-light);
-  font-size: 8px;
+  font-size: 12px;
 }
 
 /* ---------------------------------------------------------
@@ -860,7 +866,7 @@
   display: block;
   overflow: hidden;
   color: var(--ink-soft);
-  font-size: 10.5px;
+  font-size: 13.5px;
   font-weight: 700;
   line-height: 1.3;
   text-overflow: ellipsis;
@@ -871,13 +877,13 @@
   display: block;
   margin-top: 2px;
   color: var(--muted-light);
-  font-size: 8.5px;
+  font-size: 12px;
 }
 
 .activity-status {
   padding: 3px 7px;
   border-radius: 999px;
-  font-size: 7.5px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.03em;
   text-transform: uppercase;
@@ -922,12 +928,12 @@
   display: block;
   margin-bottom: 3px;
   color: var(--ink-soft);
-  font-size: 12px;
+  font-size: 14.5px;
 }
 
 .empty-state p {
   max-width: 250px;
-  font-size: 10px;
+  font-size: 13.5px;
   line-height: 1.55;
 }
 
@@ -941,7 +947,7 @@
   padding-top: 21px;
   border-top: 1px solid var(--line);
   color: var(--muted-light);
-  font-size: 8.5px;
+  font-size: 12px;
 }
 
 .dashboard-footer p {
@@ -995,7 +1001,7 @@
 
 .today-class__time {
   color: var(--muted);
-  font-size: 8.5px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1.4;
 }
@@ -1013,7 +1019,7 @@
 
 .today-class__subject strong {
   color: var(--ink-soft);
-  font-size: 11.5px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -1021,7 +1027,7 @@
   display: block;
   margin-top: 2px;
   color: var(--muted-light);
-  font-size: 8.5px;
+  font-size: 12px;
 }
 
 .today-class__tags {
@@ -1037,7 +1043,7 @@
   border-radius: 999px;
   background: var(--lime-soft);
   color: var(--green);
-  font-size: 7px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1051,7 +1057,7 @@
   border-radius: 999px;
   background: var(--sand-soft);
   color: #8f671f;
-  font-size: 7.5px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1086,7 +1092,7 @@
 .tt-table thead th {
   padding: 6px 8px;
   color: var(--muted-light);
-  font-size: 7.5px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-align: left;
@@ -1106,7 +1112,7 @@
 .tt-period b {
   display: block;
   color: var(--ink-soft);
-  font-size: 9px;
+  font-size: 13px;
   font-weight: 800;
 }
 
@@ -1114,7 +1120,7 @@
   display: block;
   margin-top: 1px;
   color: var(--muted-light);
-  font-size: 7px;
+  font-size: 11px;
   font-weight: 600;
 }
 
@@ -1153,7 +1159,7 @@
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.75);
   color: var(--green);
-  font-size: 7px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.04em;
 }
@@ -1161,7 +1167,7 @@
 .tt-cell__name {
   display: block;
   color: var(--ink-soft);
-  font-size: 9px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.3;
 }
@@ -1170,14 +1176,14 @@
   display: block;
   margin-top: 2px;
   color: var(--muted);
-  font-size: 7.5px;
+  font-size: 11px;
 }
 
 .tt-cell__faculty {
   display: block;
   margin-top: 2px;
   color: var(--muted-light);
-  font-size: 7px;
+  font-size: 11px;
   font-weight: 650;
 }
 
@@ -1187,7 +1193,7 @@
   border: 0;
   background: transparent;
   color: var(--muted-light);
-  font-size: 7px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-align: left;
@@ -1205,7 +1211,7 @@
   gap: 7px;
   padding: 10px 28px 18px;
   color: var(--muted-light);
-  font-size: 8.5px;
+  font-size: 12px;
   line-height: 1.55;
 }
 
@@ -1376,7 +1382,7 @@
   .profile-chip .avatar {
     width: 35px;
     height: 35px;
-    font-size: 10px;
+    font-size: 13.5px;
   }
 
   .icon-button {
@@ -1426,7 +1432,7 @@
   }
 
   .hero-copy {
-    font-size: 11.5px;
+    font-size: 14px;
   }
 
   .hero-stats {
@@ -1442,7 +1448,7 @@
   }
 
   .hero-stat span {
-    font-size: 7.5px;
+    font-size: 11px;
   }
 
   .hero-refresh {
@@ -1455,7 +1461,7 @@
   }
 
   .guide-card__head .eyebrow {
-    font-size: 8.5px;
+    font-size: 12px;
   }
 
   .guide-number strong {
@@ -1502,7 +1508,7 @@
   }
 
   .activity-status {
-    font-size: 7px;
+    font-size: 11px;
     padding: 3px 6px;
   }
 
@@ -1516,7 +1522,7 @@
   }
 
   .today-class__time {
-    font-size: 8px;
+    font-size: 12px;
   }
 
   .today-class__tags {
