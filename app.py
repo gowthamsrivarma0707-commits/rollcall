@@ -1908,7 +1908,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
                             WHERE st.class_id = c.id AND st.active = 1) AS student_count
                     FROM classes c
                     CROSS JOIN subjects sub
-                    ORDER BY c.code, sub.code
+                    ORDER BY c.id, sub.code
                     """
                 ).fetchall()
             else:
@@ -1932,7 +1932,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
                     JOIN classes c ON c.id = ta.class_id
                     JOIN subjects sub ON sub.id = ta.subject_id
                     WHERE ta.teacher_id = ?
-                    ORDER BY c.code, sub.code
+                    ORDER BY c.id, sub.code
                     """,
                     (teacher_id,),
                 ).fetchall()
@@ -2823,7 +2823,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
         with get_db() as conn:
             if admin:
                 class_rows = conn.execute(
-                    "SELECT id, code, name, semester FROM classes ORDER BY code"
+                    "SELECT id, code, name, semester FROM classes ORDER BY id"
                 ).fetchall()
             else:
                 class_rows = conn.execute(
@@ -2832,7 +2832,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
                     FROM classes c
                     JOIN teacher_assignments ta ON ta.class_id = c.id
                     WHERE ta.teacher_id = ?
-                    ORDER BY c.code
+                    ORDER BY c.id
                     """,
                     (teacher_id,),
                 ).fetchall()
@@ -2862,13 +2862,25 @@ class RollCallHandler(BaseHTTPRequestHandler):
                 }
 
             raw_class = query.get("class_id", [""])[0]
-            if raw_class:
+            is_all_classes = (raw_class.lower() in ("all", "0", "both")) if raw_class else False
+            if is_all_classes:
+                class_row = {
+                    "id": "all",
+                    "code": "MCA-ALL",
+                    "name": "All Sections (General + AI)",
+                    "semester": "1st Year MCA",
+                }
+                target_class_ids = list(allowed.keys())
+            elif raw_class:
                 class_id = parse_integer(raw_class, "Invalid class.")
                 if class_id <= 0 or class_id not in allowed:
                     raise ApiError(403, "You cannot view this class.")
+                class_row = dict(allowed[class_id])
+                target_class_ids = [class_id]
             else:
                 class_id = next(iter(allowed))
-            class_row = dict(allowed[class_id])
+                class_row = dict(allowed[class_id])
+                target_class_ids = [class_id]
 
             raw_subject = query.get("subject_id", [""])[0]
             subject = None
@@ -2884,48 +2896,49 @@ class RollCallHandler(BaseHTTPRequestHandler):
                     raise ApiError(404, "Subject not found.")
                 subject = dict(subject_row)
 
+            placeholders = ",".join("?" for _ in target_class_ids)
             subject_rows = conn.execute(
-                """
+                f"""
                 SELECT DISTINCT sub.id, sub.code, sub.name
                 FROM subjects sub
                 JOIN timetable t ON t.subject_id = sub.id
-                WHERE t.class_id = ?
+                WHERE t.class_id IN ({placeholders})
                 ORDER BY sub.code
                 """,
-                (class_id,),
+                target_class_ids,
             ).fetchall()
             subjects = [dict(row) for row in subject_rows]
 
             student_rows = conn.execute(
-                """
+                f"""
                 SELECT id, register_no, name
                 FROM students
-                WHERE class_id = ? AND active = 1
-                ORDER BY register_no
+                WHERE class_id IN ({placeholders}) AND active = 1
+                ORDER BY class_id, register_no
                 """,
-                (class_id,),
+                target_class_ids,
             ).fetchall()
 
             if subject:
                 record_rows = conn.execute(
-                    """
+                    f"""
                     SELECT ar.student_id, ar.status, ses.span
                     FROM attendance_records ar
                     JOIN attendance_sessions ses ON ses.id = ar.session_id
-                    WHERE ses.class_id = ? AND ses.subject_id = ?
+                    WHERE ses.class_id IN ({placeholders}) AND ses.subject_id = ?
                       AND ses.is_holiday = 0
                     """,
-                    (class_id, subject["id"]),
+                    (*target_class_ids, subject["id"]),
                 ).fetchall()
             else:
                 record_rows = conn.execute(
-                    """
+                    f"""
                     SELECT ar.student_id, ar.status, ses.span
                     FROM attendance_records ar
                     JOIN attendance_sessions ses ON ses.id = ar.session_id
-                    WHERE ses.class_id = ? AND ses.is_holiday = 0
+                    WHERE ses.class_id IN ({placeholders}) AND ses.is_holiday = 0
                     """,
-                    (class_id,),
+                    target_class_ids,
                 ).fetchall()
 
             totals: dict[int, list[int]] = defaultdict(lambda: [0, 0])
@@ -2967,7 +2980,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
             "ok": True,
             "classes": classes,
             "class": {
-                "id": int(class_row["id"]),
+                "id": class_row["id"] if class_row["id"] == "all" else int(class_row["id"]),
                 "code": class_row["code"],
                 "name": class_row["name"],
                 "semester": class_row["semester"],
@@ -3016,7 +3029,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
         with get_db() as conn:
             if admin:
                 class_rows = conn.execute(
-                    "SELECT id, code, name, semester FROM classes ORDER BY code"
+                    "SELECT id, code, name, semester FROM classes ORDER BY id"
                 ).fetchall()
             else:
                 class_rows = conn.execute(
@@ -3025,103 +3038,117 @@ class RollCallHandler(BaseHTTPRequestHandler):
                     FROM classes c
                     JOIN teacher_assignments ta ON ta.class_id = c.id
                     WHERE ta.teacher_id = ?
-                    ORDER BY c.code
+                    ORDER BY c.id
                     """,
                     (teacher_id,),
                 ).fetchall()
             allowed = {int(row["id"]): row for row in class_rows}
             if not allowed:
                 raise ApiError(404, "No class is available for export.")
-            raw_class = query.get("class_id", [""])[0]
-            if raw_class:
-                class_id = parse_integer(raw_class, "Invalid class.")
-                if class_id <= 0 or class_id not in allowed:
-                    raise ApiError(403, "You cannot export this class.")
-            else:
-                class_id = next(iter(allowed))
-            class_row = dict(allowed[class_id])
 
-            session_rows = conn.execute(
-                """
-                SELECT ses.id, ses.subject_id, sub.code AS subject_code,
-                       sub.name AS subject_name, ses.attendance_date,
-                       ses.period, ses.span, ses.is_substitution,
-                       act_t.name AS teacher_name,
-                       sch_t.name AS scheduled_teacher_name
-                FROM attendance_sessions ses
-                JOIN subjects sub ON sub.id = ses.subject_id
-                LEFT JOIN teachers act_t ON act_t.id = ses.teacher_id
-                LEFT JOIN teachers sch_t ON sch_t.id = ses.scheduled_teacher_id
-                WHERE ses.class_id = ? AND ses.is_holiday = 0
-                  AND ses.attendance_date >= ? AND ses.attendance_date < ?
-                ORDER BY sub.code, ses.attendance_date, ses.period
-                """,
-                (class_id, month_start.isoformat(), month_end.isoformat()),
-            ).fetchall()
-            session_ids = [int(row["id"]) for row in session_rows]
-            if session_ids:
-                placeholders = ",".join("?" for _ in session_ids)
-                record_rows = conn.execute(
-                    f"""
-                    SELECT session_id, student_id, status
-                    FROM attendance_records
-                    WHERE session_id IN ({placeholders})
+            raw_class = (query.get("class_id", [""])[0] or "").strip()
+            is_all_classes = (raw_class.lower() in ("all", "0", "both")) if raw_class else False
+            if is_all_classes:
+                target_classes = [dict(allowed[cid]) for cid in allowed]
+                filename = f"RollCall_MCA_Consolidated_All_Sections_{year}-{month:02d}.xlsx"
+            else:
+                if raw_class:
+                    class_id = parse_integer(raw_class, "Invalid class.")
+                    if class_id <= 0 or class_id not in allowed:
+                        raise ApiError(403, "You cannot export this class.")
+                else:
+                    class_id = next(iter(allowed))
+                target_classes = [dict(allowed[class_id])]
+                filename = f"RollCall_{target_classes[0]['code']}_{year}-{month:02d}.xlsx"
+
+            class_data_list = []
+            for class_row in target_classes:
+                cid = int(class_row["id"])
+                session_rows = conn.execute(
+                    """
+                    SELECT ses.id, ses.subject_id, sub.code AS subject_code,
+                           sub.name AS subject_name, ses.attendance_date,
+                           ses.period, ses.span, ses.is_substitution,
+                           act_t.name AS teacher_name,
+                           sch_t.name AS scheduled_teacher_name
+                    FROM attendance_sessions ses
+                    JOIN subjects sub ON sub.id = ses.subject_id
+                    LEFT JOIN teachers act_t ON act_t.id = ses.teacher_id
+                    LEFT JOIN teachers sch_t ON sch_t.id = ses.scheduled_teacher_id
+                    WHERE ses.class_id = ? AND ses.is_holiday = 0
+                      AND ses.attendance_date >= ? AND ses.attendance_date < ?
+                    ORDER BY sub.code, ses.attendance_date, ses.period
                     """,
-                    session_ids,
+                    (cid, month_start.isoformat(), month_end.isoformat()),
                 ).fetchall()
-            else:
-                record_rows = []
-            student_rows = conn.execute(
-                """
-                SELECT id, register_no, name
-                FROM students
-                WHERE class_id = ? AND active = 1
-                ORDER BY register_no
-                """,
-                (class_id,),
-            ).fetchall()
+                session_ids = [int(row["id"]) for row in session_rows]
+                if session_ids:
+                    placeholders = ",".join("?" for _ in session_ids)
+                    record_rows = conn.execute(
+                        f"""
+                        SELECT session_id, student_id, status
+                        FROM attendance_records
+                        WHERE session_id IN ({placeholders})
+                        """,
+                        session_ids,
+                    ).fetchall()
+                else:
+                    record_rows = []
+                student_rows = conn.execute(
+                    """
+                    SELECT id, register_no, name
+                    FROM students
+                    WHERE class_id = ? AND active = 1
+                    ORDER BY register_no
+                    """,
+                    (cid,),
+                ).fetchall()
+                assigned_rows = conn.execute(
+                    """
+                    SELECT DISTINCT sub.id, sub.code, sub.name
+                    FROM teacher_assignments ta
+                    JOIN subjects sub ON sub.id = ta.subject_id
+                    WHERE ta.class_id = ?
+                    ORDER BY sub.code
+                    """,
+                    (cid,),
+                ).fetchall()
 
-        records: dict[int, dict[int, str]] = defaultdict(dict)
-        for row in record_rows:
-            records[int(row["session_id"])][int(row["student_id"])] = row["status"]
-        students = [
-            {
-                "id": int(row["id"]),
-                "register_no": row["register_no"],
-                "name": row["name"],
-            }
-            for row in student_rows
-        ]
+                records: dict[int, dict[int, str]] = defaultdict(dict)
+                for row in record_rows:
+                    records[int(row["session_id"])][int(row["student_id"])] = row["status"]
+                students = [
+                    {
+                        "id": int(row["id"]),
+                        "register_no": row["register_no"],
+                        "name": row["name"],
+                    }
+                    for row in student_rows
+                ]
+                subjects: dict[str, dict] = {}
+                for a_row in assigned_rows:
+                    subjects[a_row["code"]] = {
+                        "id": a_row["id"],
+                        "code": a_row["code"],
+                        "name": a_row["name"],
+                        "sessions": [],
+                    }
+                for row in session_rows:
+                    key = row["subject_code"]
+                    group = subjects.setdefault(
+                        key,
+                        {"id": row["subject_id"], "code": row["subject_code"], "name": row["subject_name"], "sessions": []},
+                    )
+                    group["sessions"].append(row)
+                subject_list = [subjects[key] for key in sorted(subjects)]
 
-        # Ensure all assigned subjects for the class are included in order
-        with get_db() as conn:
-            assigned_rows = conn.execute(
-                """
-                SELECT DISTINCT sub.id, sub.code, sub.name
-                FROM teacher_assignments ta
-                JOIN subjects sub ON sub.id = ta.subject_id
-                WHERE ta.class_id = ?
-                ORDER BY sub.code
-                """,
-                (class_id,),
-            ).fetchall()
-
-        subjects: dict[str, dict] = {}
-        for a_row in assigned_rows:
-            subjects[a_row["code"]] = {
-                "id": a_row["id"],
-                "code": a_row["code"],
-                "name": a_row["name"],
-                "sessions": [],
-            }
-        for row in session_rows:
-            key = row["subject_code"]
-            group = subjects.setdefault(
-                key,
-                {"id": row["subject_id"], "code": row["subject_code"], "name": row["subject_name"], "sessions": []},
-            )
-            group["sessions"].append(row)
-        subject_list = [subjects[key] for key in sorted(subjects)]
+                class_data_list.append({
+                    "class_row": class_row,
+                    "session_rows": session_rows,
+                    "records": records,
+                    "students": students,
+                    "subject_list": subject_list,
+                })
 
         # ---------------- workbook styling helpers ----------------
         DARK, GREEN, SOFT, SAND = "123C2E", "1D6A4C", "E4F2E9", "F4F1E9"
@@ -3175,457 +3202,470 @@ class RollCallHandler(BaseHTTPRequestHandler):
         wb = Workbook()
 
         # ==============================================================
-        # 1. CONSOLIDATED ATTENDANCE REPORT (Official College Format)
+        # PHASE 1: CONSOLIDATED ATTENDANCE REPORTS (Official College Format)
         # ==============================================================
-        ws = wb.active
-        ws.title = "Consolidated Report"
-
-        # Number of subjects determines column layout
-        num_subjects = max(1, len(subject_list))
-        first_sub_col = 4
-        last_sub_col = first_sub_col + num_subjects - 1
-        held_col = last_sub_col + 1
-        att_col = held_col + 1
-        pct_col = att_col + 1
-        end_col = pct_col
-
-        # College title lines matching the official register
         month_upper = month_label.upper().replace(" ", "-")
-        college_lines = [
-            "Gayatri Vidya Parishad College for Degree and PG Courses(A)",
-            "Rushikonda, Visakhapatnam -530045",
-            f"Master of Computer Applications - {class_row.get('name', 'MCA 1st Semester')}",
-            f"Consolidated Attendance Report {month_upper}",
-        ]
-        title_block(ws, end_col, college_lines)
 
-        # Header rows 6 & 7: Merged table headers with soft blue background
-        for col, label in [(1, "S.No"), (2, "Regd Number"), (3, "Name/No.of Classes")]:
-            ws.merge_cells(start_row=6, start_column=col, end_row=7, end_column=col)
-            cell = ws.cell(row=6, column=col, value=label)
-            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-            cell.font = Font(name="Calibri", size=10, bold=True)
-            cell.fill = blue_fill
-            for r in (6, 7):
-                ws.cell(row=r, column=col).border = full_box
+        for c_idx, data in enumerate(class_data_list):
+            class_row = data["class_row"]
+            subject_list = data["subject_list"]
+            students = data["students"]
+            records = data["records"]
 
-        # "Subject Name and Number of Periods" banner over all subjects
-        ws.merge_cells(start_row=6, start_column=first_sub_col, end_row=6, end_column=last_sub_col)
-        banner_cell = ws.cell(row=6, column=first_sub_col, value="Subject Name and Number of Periods")
-        banner_cell.alignment = Alignment(horizontal="center", vertical="center")
-        banner_cell.font = Font(name="Calibri", size=10, bold=True)
-        banner_cell.fill = blue_fill
-        for c in range(first_sub_col, last_sub_col + 1):
-            ws.cell(row=6, column=c).border = full_box
-            ws.cell(row=6, column=c).fill = blue_fill
-
-        # Row 7: Subject Codes
-        for idx, sub in enumerate(subject_list):
-            col = first_sub_col + idx
-            cell = ws.cell(row=7, column=col, value=sub["code"])
-            cell.alignment = Alignment(horizontal="center", vertical="center")
-            cell.font = Font(name="Calibri", size=9.5, bold=True)
-            cell.fill = blue_fill
-            cell.border = full_box
-
-        # Summary columns (Merged 6 & 7)
-        for col, label in [(held_col, "Total Classes Held"), (att_col, "Total Classes Attended"), (pct_col, "PERCENTAGE")]:
-            ws.merge_cells(start_row=6, start_column=col, end_row=7, end_column=col)
-            cell = ws.cell(row=6, column=col, value=label)
-            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-            cell.font = Font(name="Calibri", size=10, bold=True)
-            cell.fill = blue_fill
-            for r in (6, 7):
-                ws.cell(row=r, column=col).border = full_box
-
-        ws.row_dimensions[6].height = 22
-        ws.row_dimensions[7].height = 20
-
-        # Row 8: Maroon subheader row with Classes Held counts
-        for c, text in [(1, "S.No"), (2, "Regd Number"), (3, "Name/No.of Classes")]:
-            cell = ws.cell(row=8, column=c, value=text)
-            cell.font = white_bold
-            cell.fill = maroon_fill
-            cell.border = full_box
-            cell.alignment = Alignment(horizontal="center", vertical="center")
-
-        subject_held_counts: list[int] = []
-        for idx, sub in enumerate(subject_list):
-            col = first_sub_col + idx
-            held = sum(int(s["span"]) for s in sub["sessions"])
-            subject_held_counts.append(held)
-            cell = ws.cell(row=8, column=col, value=held)
-            cell.font = white_bold
-            cell.fill = maroon_fill
-            cell.alignment = Alignment(horizontal="center", vertical="center")
-            cell.border = full_box
-
-        total_held_all = sum(subject_held_counts)
-        cell_held_total = ws.cell(row=8, column=held_col, value="Held" if total_held_all == 0 else total_held_all)
-        cell_held_total.font = white_bold
-        cell_held_total.fill = maroon_fill
-        cell_held_total.alignment = Alignment(horizontal="center", vertical="center")
-        cell_held_total.border = full_box
-
-        cell_att_label = ws.cell(row=8, column=att_col, value="Attended")
-        cell_att_label.font = white_bold
-        cell_att_label.fill = maroon_fill
-        cell_att_label.alignment = Alignment(horizontal="center", vertical="center")
-        cell_att_label.border = full_box
-
-        cell_pct_label = ws.cell(row=8, column=pct_col, value="%")
-        cell_pct_label.font = white_bold
-        cell_pct_label.fill = maroon_fill
-        cell_pct_label.alignment = Alignment(horizontal="center", vertical="center")
-        cell_pct_label.border = full_box
-
-        ws.row_dimensions[8].height = 22
-
-        # Student data rows starting from row 9
-        start_student_row = 9
-        for idx, student in enumerate(students):
-            r_idx = start_student_row + idx
-            s_no = idx + 1
-            reg_no = student["register_no"]
-            name = student["name"]
-
-            # Calculate total attended and per-subject attendance
-            total_student_att = 0
-            student_att_by_sub: list[int] = []
-            for sub in subject_list:
-                sub_att = 0
-                for s in sub["sessions"]:
-                    if records.get(int(s["id"]), {}).get(student["id"]) == "present":
-                        sub_att += int(s["span"])
-                student_att_by_sub.append(sub_att)
-                total_student_att += sub_att
-
-            pct_val = (total_student_att / total_held_all * 100) if total_held_all > 0 else 0
-            is_shortage = (total_held_all > 0 and pct_val < 75.0)
-
-            # Col 1: S.No
-            c_sno = ws.cell(row=r_idx, column=1, value=s_no)
-            c_sno.alignment = Alignment(horizontal="center", vertical="center")
-            c_sno.border = full_box
-            c_sno.font = Font(name="Calibri", size=10)
-
-            # Col 2: Regd Number (HIGHLIGHT ROLL NUMBER IN YELLOW IF SHORTAGE!)
-            c_reg = ws.cell(row=r_idx, column=2, value=reg_no)
-            c_reg.alignment = Alignment(horizontal="center", vertical="center")
-            c_reg.border = full_box
-            if is_shortage:
-                # Highlight Roll number with bright yellow fill and bold warning text
-                c_reg.fill = PatternFill("solid", fgColor=YELLOW_FILL)
-                c_reg.font = Font(name="Calibri", size=10, bold=True, color="B84A38")
+            if c_idx == 0:
+                ws = wb.active
             else:
-                c_reg.font = Font(name="Calibri", size=10, bold=True, color="000000")
+                ws = wb.create_sheet()
 
-            # Col 3: Student Name (Normal, clean, UNHIGHLIGHTED as requested!)
-            c_name = ws.cell(row=r_idx, column=3, value=name)
-            c_name.alignment = Alignment(horizontal="left", vertical="center")
-            c_name.font = Font(name="Calibri", size=10, bold=False, color="000000")
-            c_name.border = full_box
+            code = class_row["code"]
+            ws.title = f"{code} Consolidated" if is_all_classes else "Consolidated Report"
 
-            # Subjects attendance columns
-            for sub_idx, sub_att in enumerate(student_att_by_sub):
-                col = first_sub_col + sub_idx
-                c_sub = ws.cell(row=r_idx, column=col, value=sub_att)
-                c_sub.alignment = Alignment(horizontal="center", vertical="center")
-                c_sub.font = Font(name="Calibri", size=10)
-                c_sub.border = full_box
-
-            # Total Classes Held
-            c_held = ws.cell(row=r_idx, column=held_col, value=total_held_all)
-            c_held.alignment = Alignment(horizontal="center", vertical="center")
-            c_held.font = Font(name="Calibri", size=10, bold=True)
-            c_held.border = full_box
-
-            # Total Classes Attended formula: =SUM(first_sub_col..last_sub_col)
-            first_col_letter = get_column_letter(first_sub_col)
-            last_col_letter = get_column_letter(last_sub_col)
-            c_att = ws.cell(row=r_idx, column=att_col, value=f"=SUM({first_col_letter}{r_idx}:{last_col_letter}{r_idx})")
-            c_att.alignment = Alignment(horizontal="center", vertical="center")
-            c_att.font = Font(name="Calibri", size=10, bold=True)
-            c_att.border = full_box
-
-            # PERCENTAGE formula
-            held_col_letter = get_column_letter(held_col)
-            att_col_letter = get_column_letter(att_col)
-            c_pct = ws.cell(row=r_idx, column=pct_col, value=f"=IF({held_col_letter}{r_idx}=0,0,ROUND({att_col_letter}{r_idx}/{held_col_letter}{r_idx}*100,1))")
-            c_pct.alignment = Alignment(horizontal="center", vertical="center")
-            c_pct.border = full_box
-            if is_shortage:
-                # Red highlight for shortage percentage like the photo!
-                c_pct.fill = PatternFill("solid", fgColor="FFD8D8")
-                c_pct.font = Font(name="Calibri", size=10, bold=True, color="CC0000")
-            elif total_held_all > 0:
-                c_pct.font = Font(name="Calibri", size=10, bold=True, color="1D6A4C")
-            else:
-                c_pct.font = Font(name="Calibri", size=10, color="595959")
-
-            ws.row_dimensions[r_idx].height = 19
-
-        summary_last = start_student_row + len(students) - 1
-        if students:
-            total_row = summary_last + 1
-            ws.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=3)
-            cell = ws.cell(row=total_row, column=1, value="Combined · all subjects")
-            cell.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
-            cell.fill = header_fill
-            cell.alignment = Alignment(horizontal="left", vertical="center")
-            for c in range(1, 4):
-                ws.cell(row=total_row, column=c).border = full_box
-                ws.cell(row=total_row, column=c).fill = header_fill
-
-            for idx in range(num_subjects):
-                col = first_sub_col + idx
-                col_let = get_column_letter(col)
-                c_tot = ws.cell(row=total_row, column=col, value=f"=SUM({col_let}{start_student_row}:{col_let}{summary_last})")
-                c_tot.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
-                c_tot.fill = header_fill
-                c_tot.alignment = Alignment(horizontal="center", vertical="center")
-                c_tot.border = full_box
-
-            held_let = get_column_letter(held_col)
-            c_held_tot = ws.cell(row=total_row, column=held_col, value=f"=SUM({held_let}{start_student_row}:{held_let}{summary_last})")
-            c_held_tot.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
-            c_held_tot.fill = header_fill
-            c_held_tot.alignment = Alignment(horizontal="center", vertical="center")
-            c_held_tot.border = full_box
-
-            att_let = get_column_letter(att_col)
-            c_att_tot = ws.cell(row=total_row, column=att_col, value=f"=SUM({att_let}{start_student_row}:{att_let}{summary_last})")
-            c_att_tot.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
-            c_att_tot.fill = header_fill
-            c_att_tot.alignment = Alignment(horizontal="center", vertical="center")
-            c_att_tot.border = full_box
-
-            pct_let = get_column_letter(pct_col)
-            c_pct_tot = ws.cell(row=total_row, column=pct_col, value=f"=IF({held_let}{total_row}=0,0,ROUND({att_let}{total_row}/{held_let}{total_row}*100,1))")
-            c_pct_tot.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
-            c_pct_tot.fill = header_fill
-            c_pct_tot.alignment = Alignment(horizontal="center", vertical="center")
-            c_pct_tot.border = full_box
-
-            ws.row_dimensions[total_row].height = 22
-
-        note_row = (summary_last if students else 8) + 3
-        ws.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=end_col)
-        ws.cell(
-            row=note_row,
-            column=1,
-            value="* Roll numbers highlighted in yellow indicate attendance shortage (< 75%) · "
-            "Labs count as 2 periods and CTV as 3 · Holidays are excluded",
-        ).font = Font(name="Calibri", size=8.5, italic=True, color="68766D")
-
-        ws.column_dimensions["A"].width = 6
-        ws.column_dimensions["B"].width = 16
-        ws.column_dimensions["C"].width = 34
-        for c in range(first_sub_col, last_sub_col + 1):
-            ws.column_dimensions[get_column_letter(c)].width = 9.5
-        ws.column_dimensions[get_column_letter(held_col)].width = 13
-        ws.column_dimensions[get_column_letter(att_col)].width = 13
-        ws.column_dimensions[get_column_letter(pct_col)].width = 13
-        style_sheet(ws, 8, 1, end_col, summary_last if students else 8)
-
-        # ---------------- per-subject sheets ----------------
-        for subject in subject_list:
-            ws = wb.create_sheet(subject["code"][:31])
-            sessions = subject["sessions"]
-            session_count = len(sessions)
-            last_col = 3 + session_count
-            attended_col = last_col + 1
-            total_col = last_col + 2
-            pct_col = last_col + 3
+            # Number of subjects determines column layout
+            num_subjects = max(1, len(subject_list))
+            first_sub_col = 4
+            last_sub_col = first_sub_col + num_subjects - 1
+            held_col = last_sub_col + 1
+            att_col = held_col + 1
+            pct_col = att_col + 1
             end_col = pct_col
-            title_block(
-                ws,
-                end_col,
-                [
-                    f"{subject['code']} · {subject['name']}",
-                    f"{class_row['code']} · {month_label}",
-                    "1 = present, 0 = absent · Labs count as 2 periods and CTV as 3 · Holidays are excluded",
-                ],
-            )
-            header_row = 5
-            base_headers = ["#", "Register No", "Student Name"]
-            session_headers = []
-            for row in sessions:
-                day = date.fromisoformat(row["attendance_date"])
-                period = int(row["period"])
-                span = int(row["span"])
-                period_label = f"P{period}" if span == 1 else f"P{period}–P{period + span - 1}"
-                session_headers.append(f"{day.strftime('%d %b')}\n{period_label}")
-            for col, label in enumerate(base_headers + session_headers + ["Attended", "Total", "Attendance %"], start=1):
-                cell = ws.cell(row=header_row, column=col, value=label)
+
+            # College title lines matching the official register
+            college_lines = [
+                "Gayatri Vidya Parishad College for Degree and PG Courses(A)",
+                "Rushikonda, Visakhapatnam -530045",
+                f"Master of Computer Applications - {class_row.get('name', 'MCA 1st Semester')}",
+                f"Consolidated Attendance Report {month_upper}",
+            ]
+            title_block(ws, end_col, college_lines)
+
+            # Header rows 6 & 7: Merged table headers with soft blue background
+            for col, label in [(1, "S.No"), (2, "Regd Number"), (3, "Name/No.of Classes")]:
+                ws.merge_cells(start_row=6, start_column=col, end_row=7, end_column=col)
+                cell = ws.cell(row=6, column=col, value=label)
+                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                cell.font = Font(name="Calibri", size=10, bold=True)
+                cell.fill = blue_fill
+                for r in (6, 7):
+                    ws.cell(row=r, column=col).border = full_box
+
+            # "Subject Name and Number of Periods" banner over all subjects
+            ws.merge_cells(start_row=6, start_column=first_sub_col, end_row=6, end_column=last_sub_col)
+            banner_cell = ws.cell(row=6, column=first_sub_col, value="Subject Name and Number of Periods")
+            banner_cell.alignment = Alignment(horizontal="center", vertical="center")
+            banner_cell.font = Font(name="Calibri", size=10, bold=True)
+            banner_cell.fill = blue_fill
+            for c in range(first_sub_col, last_sub_col + 1):
+                ws.cell(row=6, column=c).border = full_box
+                ws.cell(row=6, column=c).fill = blue_fill
+
+            # Row 7: Subject Codes
+            for idx, sub in enumerate(subject_list):
+                col = first_sub_col + idx
+                cell = ws.cell(row=7, column=col, value=sub["code"])
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+                cell.font = Font(name="Calibri", size=9.5, bold=True)
+                cell.fill = blue_fill
+                cell.border = full_box
+
+            # Summary columns (Merged 6 & 7)
+            for col, label in [(held_col, "Total Classes Held"), (att_col, "Total Classes Attended"), (pct_col, "PERCENTAGE")]:
+                ws.merge_cells(start_row=6, start_column=col, end_row=7, end_column=col)
+                cell = ws.cell(row=6, column=col, value=label)
+                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                cell.font = Font(name="Calibri", size=10, bold=True)
+                cell.fill = blue_fill
+                for r in (6, 7):
+                    ws.cell(row=r, column=col).border = full_box
+
+            ws.row_dimensions[6].height = 22
+            ws.row_dimensions[7].height = 20
+
+            # Row 8: Maroon subheader row with Classes Held counts
+            for c, text in [(1, "S.No"), (2, "Regd Number"), (3, "Name/No.of Classes")]:
+                cell = ws.cell(row=8, column=c, value=text)
                 cell.font = white_bold
-                cell.fill = header_fill
-                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-                cell.border = box
-            ws.row_dimensions[header_row].height = 30
-            span_row = header_row + 1
-            ws.cell(row=span_row, column=1, value="").fill = span_fill
-            ws.cell(row=span_row, column=2, value="span").font = Font(
-                name="Calibri", size=8, italic=True, color="68766D"
-            )
-            ws.cell(row=span_row, column=2).fill = span_fill
-            ws.cell(row=span_row, column=2).alignment = Alignment(horizontal="center", vertical="center")
-            ws.cell(row=span_row, column=3, value="periods").font = Font(
-                name="Calibri", size=8, italic=True, color="68766D"
-            )
-            ws.cell(row=span_row, column=3).fill = span_fill
-            ws.cell(row=span_row, column=3).alignment = Alignment(vertical="center")
-            for offset, row in enumerate(sessions):
-                cell = ws.cell(row=span_row, column=4 + offset, value=int(row["span"]))
-                cell.fill = span_fill
+                cell.fill = maroon_fill
+                cell.border = full_box
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-                cell.border = box
-            for col in (attended_col, total_col, pct_col):
-                cell = ws.cell(row=span_row, column=col, value="")
-                cell.fill = span_fill
-                cell.border = box
-            ws.row_dimensions[span_row].height = 15
 
-            teacher_row = span_row + 1
-            ws.cell(row=teacher_row, column=1, value="").fill = span_fill
-            ws.cell(row=teacher_row, column=1).border = box
-            ws.cell(row=teacher_row, column=2, value="teacher").font = Font(
-                name="Calibri", size=8, italic=True, color="68766D"
-            )
-            ws.cell(row=teacher_row, column=2).fill = span_fill
-            ws.cell(row=teacher_row, column=2).alignment = Alignment(
-                horizontal="center", vertical="center"
-            )
-            ws.cell(row=teacher_row, column=2).border = box
-            ws.cell(row=teacher_row, column=3, value="who taught (S = substitute)").font = Font(
-                name="Calibri", size=8, italic=True, color="68766D"
-            )
-            ws.cell(row=teacher_row, column=3).fill = span_fill
-            ws.cell(row=teacher_row, column=3).alignment = Alignment(vertical="center")
-            ws.cell(row=teacher_row, column=3).border = box
-            for offset, row in enumerate(sessions):
-                teacher_name = str(row["teacher_name"] or "—")
-                label = f"S {teacher_name}" if int(row["is_substitution"] or 0) else teacher_name
-                cell = ws.cell(row=teacher_row, column=4 + offset, value=label)
-                cell.fill = span_fill
-                cell.border = box
-                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-                cell.font = Font(
-                    name="Calibri", size=6.5,
-                    bold=bool(int(row["is_substitution"] or 0)),
-                    color="8A5A00" if int(row["is_substitution"] or 0) else "4A544C",
-                )
-            for col in (attended_col, total_col, pct_col):
-                cell = ws.cell(row=teacher_row, column=col, value="")
-                cell.fill = span_fill
-                cell.border = box
-            ws.row_dimensions[teacher_row].height = 22
+            subject_held_counts: list[int] = []
+            for idx, sub in enumerate(subject_list):
+                col = first_sub_col + idx
+                held = sum(int(s["span"]) for s in sub["sessions"])
+                subject_held_counts.append(held)
+                cell = ws.cell(row=8, column=col, value=held)
+                cell.font = white_bold
+                cell.fill = maroon_fill
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+                cell.border = full_box
 
-            first_student_row = teacher_row + 1
-            session_start_col = 4
-            session_end_col = 3 + session_count
-            sub_total_held = sum(int(s["span"]) for s in sessions)
-            for index, student in enumerate(students):
-                row_idx = first_student_row + index
-                sub_att = sum(int(s["span"]) for s in sessions if records.get(int(s["id"]), {}).get(student["id"]) == "present")
-                sub_is_shortage = (sub_total_held > 0 and (sub_att / sub_total_held) < 0.75)
+            total_held_all = sum(subject_held_counts)
+            cell_held_total = ws.cell(row=8, column=held_col, value="Held" if total_held_all == 0 else total_held_all)
+            cell_held_total.font = white_bold
+            cell_held_total.fill = maroon_fill
+            cell_held_total.alignment = Alignment(horizontal="center", vertical="center")
+            cell_held_total.border = full_box
 
-                ws.cell(row=row_idx, column=1, value=index + 1).alignment = Alignment(horizontal="center")
+            cell_att_label = ws.cell(row=8, column=att_col, value="Attended")
+            cell_att_label.font = white_bold
+            cell_att_label.fill = maroon_fill
+            cell_att_label.alignment = Alignment(horizontal="center", vertical="center")
+            cell_att_label.border = full_box
 
-                c_reg = ws.cell(row=row_idx, column=2, value=student["register_no"])
+            cell_pct_label = ws.cell(row=8, column=pct_col, value="%")
+            cell_pct_label.font = white_bold
+            cell_pct_label.fill = maroon_fill
+            cell_pct_label.alignment = Alignment(horizontal="center", vertical="center")
+            cell_pct_label.border = full_box
+
+            ws.row_dimensions[8].height = 22
+
+            # Student data rows starting from row 9
+            start_student_row = 9
+            for idx, student in enumerate(students):
+                r_idx = start_student_row + idx
+                s_no = idx + 1
+                reg_no = student["register_no"]
+                name = student["name"]
+
+                total_student_att = 0
+                student_att_by_sub: list[int] = []
+                for sub in subject_list:
+                    sub_att = 0
+                    for s in sub["sessions"]:
+                        if records.get(int(s["id"]), {}).get(student["id"]) == "present":
+                            sub_att += int(s["span"])
+                    student_att_by_sub.append(sub_att)
+                    total_student_att += sub_att
+
+                pct_val = (total_student_att / total_held_all * 100) if total_held_all > 0 else 0
+                is_shortage = (total_held_all > 0 and pct_val < 75.0)
+
+                # Col 1: S.No
+                c_sno = ws.cell(row=r_idx, column=1, value=s_no)
+                c_sno.alignment = Alignment(horizontal="center", vertical="center")
+                c_sno.border = full_box
+                c_sno.font = Font(name="Calibri", size=10)
+
+                # Col 2: Regd Number (HIGHLIGHT ROLL NUMBER IN YELLOW IF SHORTAGE)
+                c_reg = ws.cell(row=r_idx, column=2, value=reg_no)
                 c_reg.alignment = Alignment(horizontal="center", vertical="center")
-                if sub_is_shortage:
+                c_reg.border = full_box
+                if is_shortage:
                     c_reg.fill = PatternFill("solid", fgColor=YELLOW_FILL)
-                    c_reg.font = Font(name="Calibri", size=9.5, bold=True, color="B84A38")
+                    c_reg.font = Font(name="Calibri", size=10, bold=True, color="B84A38")
                 else:
-                    c_reg.font = Font(name="Calibri", size=9.5, bold=True, color="000000")
+                    c_reg.font = Font(name="Calibri", size=10, bold=True, color="000000")
 
-                c_name = ws.cell(row=row_idx, column=3, value=student["name"])
-                c_name.font = Font(name="Calibri", size=9.5, bold=False, color="000000")
-                for offset, session in enumerate(sessions):
-                    value = records.get(int(session["id"]), {}).get(student["id"])
-                    cell = ws.cell(
-                        row=row_idx,
-                        column=4 + offset,
-                        value=(1 if value == "present" else 0) if value in {"present", "absent"} else None,
-                    )
-                    cell.alignment = Alignment(horizontal="center")
-                    cell.border = box
-                    if value == "absent":
-                        cell.font = Font(name="Calibri", size=9, color="B84A38")
-                attended_letter = get_column_letter(attended_col)
-                attended_cell = ws.cell(row=row_idx, column=attended_col)
-                ws.cell(
-                    row=row_idx,
-                    column=attended_col,
-                    value=f"=SUMPRODUCT($D${span_row}:${get_column_letter(session_end_col)}${span_row},"
-                    f"D{row_idx}:{get_column_letter(session_end_col)}{row_idx})",
-                ).number_format = "0"
-                ws.cell(row=row_idx, column=total_col, value=f"=SUM($D${span_row}:${get_column_letter(session_end_col)}${span_row})").number_format = "0"
-                pct_cell = ws.cell(
-                    row=row_idx,
-                    column=pct_col,
-                    value=f"=IF({get_column_letter(total_col)}{row_idx}=0,0,ROUND({attended_letter}{row_idx}/{get_column_letter(total_col)}{row_idx}*100,1))",
-                )
-                pct_cell.number_format = '0.0"%"'
-                if sub_is_shortage:
-                    pct_cell.fill = PatternFill("solid", fgColor="FFD8D8")
-                    pct_cell.font = Font(name="Calibri", size=9.5, bold=True, color="CC0000")
-                elif sub_total_held > 0:
-                    pct_cell.font = Font(name="Calibri", size=9.5, bold=True, color="1D6A4C")
+                # Col 3: Student Name (Normal, clean, unhighlighted)
+                c_name = ws.cell(row=r_idx, column=3, value=name)
+                c_name.alignment = Alignment(horizontal="left", vertical="center")
+                c_name.font = Font(name="Calibri", size=10, bold=False, color="000000")
+                c_name.border = full_box
+
+                # Subjects attendance columns
+                for sub_idx, sub_att in enumerate(student_att_by_sub):
+                    col = first_sub_col + sub_idx
+                    c_sub = ws.cell(row=r_idx, column=col, value=sub_att)
+                    c_sub.alignment = Alignment(horizontal="center", vertical="center")
+                    c_sub.font = Font(name="Calibri", size=10)
+                    c_sub.border = full_box
+
+                # Total Classes Held
+                c_held = ws.cell(row=r_idx, column=held_col, value=total_held_all)
+                c_held.alignment = Alignment(horizontal="center", vertical="center")
+                c_held.font = Font(name="Calibri", size=10, bold=True)
+                c_held.border = full_box
+
+                # Total Classes Attended formula
+                first_col_letter = get_column_letter(first_sub_col)
+                last_col_letter = get_column_letter(last_sub_col)
+                c_att = ws.cell(row=r_idx, column=att_col, value=f"=SUM({first_col_letter}{r_idx}:{last_col_letter}{r_idx})")
+                c_att.alignment = Alignment(horizontal="center", vertical="center")
+                c_att.font = Font(name="Calibri", size=10, bold=True)
+                c_att.border = full_box
+
+                # PERCENTAGE formula
+                held_col_letter = get_column_letter(held_col)
+                att_col_letter = get_column_letter(att_col)
+                c_pct = ws.cell(row=r_idx, column=pct_col, value=f"=IF({held_col_letter}{r_idx}=0,0,ROUND({att_col_letter}{r_idx}/{held_col_letter}{r_idx}*100,1))")
+                c_pct.alignment = Alignment(horizontal="center", vertical="center")
+                c_pct.border = full_box
+                if is_shortage:
+                    c_pct.fill = PatternFill("solid", fgColor="FFD8D8")
+                    c_pct.font = Font(name="Calibri", size=10, bold=True, color="CC0000")
+                elif total_held_all > 0:
+                    c_pct.font = Font(name="Calibri", size=10, bold=True, color="1D6A4C")
                 else:
-                    pct_cell.font = Font(name="Calibri", size=9.5, color="595959")
-                for col in (attended_col, total_col, pct_col):
-                    ws.cell(row=row_idx, column=col).alignment = Alignment(horizontal="center")
-                    ws.cell(row=row_idx, column=col).border = box
-                ws.cell(row=row_idx, column=1).border = box
-                ws.cell(row=row_idx, column=2).alignment = Alignment(vertical="center")
-                ws.cell(row=row_idx, column=2).border = box
-                ws.cell(row=row_idx, column=3).border = box
-                if index % 2 == 1:
-                    for col in range(1, end_col + 1):
-                        cell = ws.cell(row=row_idx, column=col)
-                        if cell.fill.fill_type is None:
-                            cell.fill = alt_fill
-                if index % 4 == 0:
-                    ws.row_dimensions[row_idx].height = 17
-            last_student_row = first_student_row + len(students) - 1
-            total_row = last_student_row + 1
-            ws.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=3)
-            cell = ws.cell(row=total_row, column=1, value="Combined")
-            cell.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
-            cell.fill = header_fill
-            cell.alignment = Alignment(vertical="center")
-            for offset in range(session_count):
-                cell = ws.cell(row=total_row, column=4 + offset, value=f"=SUM(D{first_student_row}:D{last_student_row})" if offset == 0 else f"=SUM({get_column_letter(4 + offset)}{first_student_row}:{get_column_letter(4 + offset)}{last_student_row})")
-                cell.alignment = Alignment(horizontal="center")
-                cell.font = Font(name="Calibri", size=8, bold=True, color="FFFFFF")
-                cell.fill = header_fill
-                cell.border = box
-            ws.cell(row=total_row, column=attended_col, value=f"=SUM({get_column_letter(attended_col)}{first_student_row}:{get_column_letter(attended_col)}{last_student_row})").number_format = "0"
-            ws.cell(row=total_row, column=total_col, value=f"=SUM({get_column_letter(total_col)}{first_student_row}:{get_column_letter(total_col)}{last_student_row})").number_format = "0"
-            ws.cell(row=total_row, column=pct_col, value=f"=IF({get_column_letter(total_col)}{total_row}=0,0,ROUND({get_column_letter(attended_col)}{total_row}/{get_column_letter(total_col)}{total_row}*100,1))").number_format = '0.0"%"'
-            for col in range(1, end_col + 1):
-                cell = ws.cell(row=total_row, column=col)
-                if cell.fill.fill_type is None:
-                    cell.fill = header_fill
-                cell.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
-                cell.border = box
-                cell.alignment = Alignment(horizontal="center", vertical="center")
-            ws.cell(row=total_row, column=1).alignment = Alignment(horizontal="left", vertical="center")
-            ws.row_dimensions[total_row].height = 19
+                    c_pct.font = Font(name="Calibri", size=10, color="595959")
+
+                ws.row_dimensions[r_idx].height = 19
+
+            summary_last = start_student_row + len(students) - 1
+            if students:
+                total_row = summary_last + 1
+                ws.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=3)
+                cell_total_label = ws.cell(row=total_row, column=1, value="Combined Total / Average")
+                cell_total_label.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+                cell_total_label.fill = header_fill
+                cell_total_label.alignment = Alignment(horizontal="center", vertical="center")
+
+                for c in range(1, 4):
+                    ws.cell(row=total_row, column=c).border = full_box
+                    ws.cell(row=total_row, column=c).fill = header_fill
+
+                for sub_idx, sub in enumerate(subject_list):
+                    col = first_sub_col + sub_idx
+                    col_letter = get_column_letter(col)
+                    c_sub_tot = ws.cell(row=total_row, column=col, value=f"=SUM({col_letter}9:{col_letter}{summary_last})")
+                    c_sub_tot.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+                    c_sub_tot.fill = header_fill
+                    c_sub_tot.alignment = Alignment(horizontal="center", vertical="center")
+                    c_sub_tot.border = full_box
+
+                held_col_letter = get_column_letter(held_col)
+                c_tot_held = ws.cell(row=total_row, column=held_col, value=f"=SUM({held_col_letter}9:{held_col_letter}{summary_last})")
+                c_tot_held.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+                c_tot_held.fill = header_fill
+                c_tot_held.alignment = Alignment(horizontal="center", vertical="center")
+                c_tot_held.border = full_box
+
+                att_col_letter = get_column_letter(att_col)
+                c_tot_att = ws.cell(row=total_row, column=att_col, value=f"=SUM({att_col_letter}9:{att_col_letter}{summary_last})")
+                c_tot_att.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+                c_tot_att.fill = header_fill
+                c_tot_att.alignment = Alignment(horizontal="center", vertical="center")
+                c_tot_att.border = full_box
+
+                pct_col_letter = get_column_letter(pct_col)
+                c_tot_pct = ws.cell(row=total_row, column=pct_col, value=f"=IF({held_col_letter}{total_row}=0,0,ROUND({att_col_letter}{total_row}/{held_col_letter}{total_row}*100,1))")
+                c_tot_pct.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+                c_tot_pct.fill = header_fill
+                c_tot_pct.alignment = Alignment(horizontal="center", vertical="center")
+                c_tot_pct.border = full_box
+
+                ws.row_dimensions[total_row].height = 20
+
+            note_row = (summary_last if students else 8) + 3
+            ws.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=end_col)
+            ws.cell(
+                row=note_row,
+                column=1,
+                value="* Roll numbers highlighted in yellow indicate attendance shortage (< 75%) · "
+                "Labs count as 2 periods and CTV as 3 · Holidays are excluded",
+            ).font = Font(name="Calibri", size=8.5, italic=True, color="68766D")
+
             ws.column_dimensions["A"].width = 6
-            ws.column_dimensions["B"].width = 18
-            ws.column_dimensions["C"].width = 36
-            for offset in range(session_count):
-                ws.column_dimensions[get_column_letter(4 + offset)].width = 11.5
-            ws.column_dimensions[get_column_letter(attended_col)].width = 13
-            ws.column_dimensions[get_column_letter(total_col)].width = 13
-            ws.column_dimensions[get_column_letter(pct_col)].width = 15
-            ws.row_dimensions[header_row].height = 32
-            style_sheet(ws, header_row, 1, end_col, total_row)
+            ws.column_dimensions["B"].width = 16
+            ws.column_dimensions["C"].width = 34
+            for c in range(first_sub_col, last_sub_col + 1):
+                ws.column_dimensions[get_column_letter(c)].width = 9.5
+            ws.column_dimensions[get_column_letter(held_col)].width = 13
+            ws.column_dimensions[get_column_letter(att_col)].width = 13
+            ws.column_dimensions[get_column_letter(pct_col)].width = 13
+            style_sheet(ws, 8, 1, end_col, summary_last if students else 8)
 
-        filename = f"RollCall_{class_row['code']}_{year}-{month:02d}.xlsx"
+        # ==============================================================
+        # PHASE 2: PER-SUBJECT DETAIL SHEETS
+        # ==============================================================
+        for data in class_data_list:
+            class_row = data["class_row"]
+            subject_list = data["subject_list"]
+            students = data["students"]
+            records = data["records"]
+            code_prefix = class_row["code"].replace("MCA-", "")
+
+            for subject in subject_list:
+                sub_code = subject["code"]
+                sheet_title = f"{code_prefix}-{sub_code}"[:31] if is_all_classes else sub_code[:31]
+                ws = wb.create_sheet(sheet_title)
+
+                sessions = subject["sessions"]
+                session_count = len(sessions)
+                last_col = 3 + session_count
+                attended_col = last_col + 1
+                total_col = last_col + 2
+                pct_col = last_col + 3
+                end_col = pct_col
+
+                title_block(
+                    ws,
+                    end_col,
+                    [
+                        f"{subject['code']} · {subject['name']}",
+                        f"{class_row['code']} ({class_row.get('name', '')}) · {month_label}",
+                        "1 = present, 0 = absent · Labs count as 2 periods and CTV as 3 · Holidays are excluded",
+                    ],
+                )
+                header_row = 5
+                base_headers = ["#", "Register No", "Student Name"]
+                session_headers = []
+                for row in sessions:
+                    day = date.fromisoformat(row["attendance_date"])
+                    period = int(row["period"])
+                    span = int(row["span"])
+                    period_label = f"P{period}" if span == 1 else f"P{period}–P{period + span - 1}"
+                    session_headers.append(f"{day.strftime('%d %b')}\\n{period_label}")
+                for col, label in enumerate(base_headers + session_headers + ["Attended", "Total", "Attendance %"], start=1):
+                    cell = ws.cell(row=header_row, column=col, value=label)
+                    cell.font = white_bold
+                    cell.fill = header_fill
+                    cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                    cell.border = box
+                ws.row_dimensions[header_row].height = 30
+                span_row = header_row + 1
+                ws.cell(row=span_row, column=1, value="").fill = span_fill
+                ws.cell(row=span_row, column=2, value="span").font = Font(
+                    name="Calibri", size=8, italic=True, color="68766D"
+                )
+                ws.cell(row=span_row, column=2).fill = span_fill
+                ws.cell(row=span_row, column=2).alignment = Alignment(horizontal="center", vertical="center")
+                ws.cell(row=span_row, column=3, value="periods").font = Font(
+                    name="Calibri", size=8, italic=True, color="68766D"
+                )
+                ws.cell(row=span_row, column=3).fill = span_fill
+                ws.cell(row=span_row, column=3).alignment = Alignment(vertical="center")
+                for offset, row in enumerate(sessions):
+                    cell = ws.cell(row=span_row, column=4 + offset, value=int(row["span"]))
+                    cell.fill = span_fill
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                    cell.border = box
+                for col in (attended_col, total_col, pct_col):
+                    cell = ws.cell(row=span_row, column=col, value="")
+                    cell.fill = span_fill
+                    cell.border = box
+                ws.row_dimensions[span_row].height = 17
+
+                teacher_row = span_row + 1
+                ws.cell(row=teacher_row, column=1, value="").fill = span_fill
+                ws.cell(row=teacher_row, column=2, value="faculty").font = Font(
+                    name="Calibri", size=8, italic=True, color="68766D"
+                )
+                ws.cell(row=teacher_row, column=2).fill = span_fill
+                ws.cell(row=teacher_row, column=2).alignment = Alignment(horizontal="center", vertical="center")
+                ws.cell(row=teacher_row, column=3, value="").fill = span_fill
+                for offset, row in enumerate(sessions):
+                    name = row["teacher_name"] or row["scheduled_teacher_name"] or "—"
+                    first = name.split()[0] if name != "—" else name
+                    cell = ws.cell(row=teacher_row, column=4 + offset, value=first)
+                    cell.font = Font(name="Calibri", size=8, italic=True, color="435248")
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                    cell.fill = span_fill
+                    cell.border = box
+                for col in (attended_col, total_col, pct_col):
+                    cell = ws.cell(row=teacher_row, column=col, value="")
+                    cell.fill = span_fill
+                    cell.border = box
+                ws.row_dimensions[teacher_row].height = 22
+
+                first_student_row = teacher_row + 1
+                session_start_col = 4
+                session_end_col = 3 + session_count
+                sub_total_held = sum(int(s["span"]) for s in sessions)
+                for index, student in enumerate(students):
+                    row_idx = first_student_row + index
+                    sub_att = sum(int(s["span"]) for s in sessions if records.get(int(s["id"]), {}).get(student["id"]) == "present")
+                    sub_is_shortage = (sub_total_held > 0 and (sub_att / sub_total_held) < 0.75)
+
+                    ws.cell(row=row_idx, column=1, value=index + 1).alignment = Alignment(horizontal="center")
+
+                    c_reg = ws.cell(row=row_idx, column=2, value=student["register_no"])
+                    c_reg.alignment = Alignment(horizontal="center", vertical="center")
+                    if sub_is_shortage:
+                        c_reg.fill = PatternFill("solid", fgColor=YELLOW_FILL)
+                        c_reg.font = Font(name="Calibri", size=9.5, bold=True, color="B84A38")
+                    else:
+                        c_reg.font = Font(name="Calibri", size=9.5, bold=True, color="000000")
+
+                    c_name = ws.cell(row=row_idx, column=3, value=student["name"])
+                    c_name.font = Font(name="Calibri", size=9.5, bold=False, color="000000")
+                    for offset, session in enumerate(sessions):
+                        value = records.get(int(session["id"]), {}).get(student["id"])
+                        cell = ws.cell(
+                            row=row_idx,
+                            column=4 + offset,
+                            value=(1 if value == "present" else 0) if value in {"present", "absent"} else None,
+                        )
+                        cell.alignment = Alignment(horizontal="center", vertical="center")
+                        cell.font = Font(name="Calibri", size=9)
+                        if value == "absent":
+                            cell.font = Font(name="Calibri", size=9, bold=True, color=ALERT_RED)
+                        cell.border = box
+                    if session_count > 0:
+                        first_letter = get_column_letter(session_start_col)
+                        last_letter = get_column_letter(session_end_col)
+                        span_start_letter = get_column_letter(session_start_col)
+                        span_end_letter = get_column_letter(session_end_col)
+                        ws.cell(
+                            row=row_idx,
+                            column=attended_col,
+                            value=f"=SUMPRODUCT({first_letter}{row_idx}:{last_letter}{row_idx},${span_start_letter}${span_row}:${span_end_letter}${span_row})",
+                        ).number_format = "0"
+                        ws.cell(
+                            row=row_idx,
+                            column=total_col,
+                            value=f"=SUMIF({first_letter}{row_idx}:{last_letter}{row_idx}, '>=0', ${span_start_letter}${span_row}:${span_end_letter}${span_row})",
+                        ).number_format = "0"
+                        ws.cell(
+                            row=row_idx,
+                            column=pct_col,
+                            value=f"=IF({get_column_letter(total_col)}{row_idx}=0,0,ROUND({get_column_letter(attended_col)}{row_idx}/{get_column_letter(total_col)}{row_idx}*100,1))",
+                        ).number_format = '0.0"%"'
+                    else:
+                        ws.cell(row=row_idx, column=attended_col, value=0)
+                        ws.cell(row=row_idx, column=total_col, value=0)
+                        ws.cell(row=row_idx, column=pct_col, value=0)
+                    for col in (attended_col, total_col, pct_col):
+                        ws.cell(row=row_idx, column=col).alignment = Alignment(horizontal="center", vertical="center")
+                        ws.cell(row=row_idx, column=col).font = Font(name="Calibri", size=9.5, bold=True)
+                        ws.cell(row=row_idx, column=col).border = box
+                    ws.cell(row=row_idx, column=1).border = box
+                    ws.cell(row=row_idx, column=2).alignment = Alignment(vertical="center")
+                    ws.cell(row=row_idx, column=2).border = box
+                    ws.cell(row=row_idx, column=3).border = box
+                    if index % 2 == 1:
+                        for col in range(1, end_col + 1):
+                            cell = ws.cell(row=row_idx, column=col)
+                            if cell.fill.fill_type is None:
+                                cell.fill = alt_fill
+                    if index % 4 == 0:
+                        ws.row_dimensions[row_idx].height = 17
+                last_student_row = first_student_row + len(students) - 1
+                total_row = last_student_row + 1
+                ws.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=3)
+                cell = ws.cell(row=total_row, column=1, value="Combined")
+                cell.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+                cell.fill = header_fill
+                cell.alignment = Alignment(vertical="center")
+                for offset in range(session_count):
+                    cell = ws.cell(row=total_row, column=4 + offset, value=f"=SUM(D{first_student_row}:D{last_student_row})" if offset == 0 else f"=SUM({get_column_letter(4 + offset)}{first_student_row}:{get_column_letter(4 + offset)}{last_student_row})")
+                    cell.alignment = Alignment(horizontal="center")
+                    cell.font = Font(name="Calibri", size=8, bold=True, color="FFFFFF")
+                    cell.fill = header_fill
+                    cell.border = box
+                ws.cell(row=total_row, column=attended_col, value=f"=SUM({get_column_letter(attended_col)}{first_student_row}:{get_column_letter(attended_col)}{last_student_row})").number_format = "0"
+                ws.cell(row=total_row, column=total_col, value=f"=SUM({get_column_letter(total_col)}{first_student_row}:{get_column_letter(total_col)}{last_student_row})").number_format = "0"
+                ws.cell(row=total_row, column=pct_col, value=f"=IF({get_column_letter(total_col)}{total_row}=0,0,ROUND({get_column_letter(attended_col)}{total_row}/{get_column_letter(total_col)}{total_row}*100,1))").number_format = '0.0"%"'
+                for col in range(1, end_col + 1):
+                    cell = ws.cell(row=total_row, column=col)
+                    if cell.fill.fill_type is None:
+                        cell.fill = header_fill
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+                    cell.border = box
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                ws.cell(row=total_row, column=1).alignment = Alignment(horizontal="left", vertical="center")
+                ws.row_dimensions[total_row].height = 19
+                ws.column_dimensions["A"].width = 6
+                ws.column_dimensions["B"].width = 18
+                ws.column_dimensions["C"].width = 36
+                for offset in range(session_count):
+                    ws.column_dimensions[get_column_letter(4 + offset)].width = 11.5
+                ws.column_dimensions[get_column_letter(attended_col)].width = 13
+                ws.column_dimensions[get_column_letter(total_col)].width = 13
+                ws.column_dimensions[get_column_letter(pct_col)].width = 15
+                ws.row_dimensions[header_row].height = 32
+                style_sheet(ws, header_row, 1, end_col, total_row)
+
         try:
             with get_db() as conn:
                 audit(
@@ -3633,7 +3673,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
                     "admin" if admin else "teacher",
                     teacher_id,
                     "export_students",
-                    f"class={class_row['code']} month={year}-{month:02d}",
+                    f"class={'ALL' if is_all_classes else target_classes[0]['code']} month={year}-{month:02d}",
                 )
         except Exception:
             pass

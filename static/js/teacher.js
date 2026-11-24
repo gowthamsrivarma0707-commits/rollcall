@@ -1417,11 +1417,13 @@ const state = {
   function initializeStudentsControls() {
     const classFilter = $("studentsClassFilter");
     if (!classFilter) return;
-    classFilter.innerHTML = state.classes
-      .map((classItem) =>
+    const options = [
+      ...state.classes.map((classItem) =>
         optionMarkup(classItem.id, `${classItem.code} · ${classItem.name}`)
-      )
-      .join("");
+      ),
+      optionMarkup("all", "All Sections (General + AI)"),
+    ];
+    classFilter.innerHTML = options.join("");
     populateStudentsSubjects(classFilter.value || "");
   }
 
@@ -1430,7 +1432,7 @@ const state = {
     if (!subjectFilter) return;
     const subjects = new Map();
     state.assignments
-      .filter((item) => !classId || item.class_id === Number(classId))
+      .filter((item) => !classId || classId === "all" || item.class_id === Number(classId))
       .forEach((item) => {
         if (!subjects.has(item.subject_id)) {
           subjects.set(item.subject_id, {
