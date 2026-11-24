@@ -724,12 +724,14 @@
 .table-class {
   display: inline-flex;
   align-items: center;
-  min-height: 21px;
-  padding: 0 6px;
-  border-radius: 5px;
-  background: var(--bg-soft);
-  color: var(--muted);
-  font-size: 12px;
+  min-height: 24px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(29, 106, 76, 0.2);
+  background: rgba(29, 106, 76, 0.08);
+  color: var(--green-dark);
+  font-family: var(--font-display), monospace;
+  font-size: 13px;
   font-weight: 800;
   letter-spacing: 0.03em;
 }
@@ -1141,23 +1143,37 @@
   min-width: 0;
 }
 
-.roster-student strong {
-  display: block;
-  overflow: hidden;
-  color: var(--ink-soft);
+.roster-student strong,
+.roster-student .roster-regno {
+  display: inline-flex;
+  align-items: center;
+  color: var(--green-dark);
+  background: rgba(29, 106, 76, 0.09);
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(29, 106, 76, 0.22);
+  font-family: var(--font-display), monospace;
   font-size: 13.5px;
-  font-weight: 700;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
 }
 
-.roster-student span {
+.roster-student span,
+.roster-student .roster-name {
   display: block;
-  margin-top: 1px;
-  color: var(--muted-light);
-  font-size: 12px;
-  letter-spacing: 0.02em;
+  margin-top: 3px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.roster-row.is-absent .roster-student .roster-regno {
+  color: var(--danger);
+  background: var(--coral-soft);
+  border-color: rgba(184, 74, 56, 0.4);
+  box-shadow: 0 0 0 2px rgba(184, 74, 56, 0.2);
 }
 
 .status-toggle {
