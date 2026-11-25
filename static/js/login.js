@@ -15,7 +15,7 @@
       subtitle:
         "Sign in with your register number to see your live attendance, safe-to-skip allowance and recovery plan.",
       usernameLabel: "Register number",
-      usernamePlaceholder: "e.g. 26PSMCA0001",
+      usernamePlaceholder: "Enter register number",
       usernameAutocomplete: "username",
       autocapitalize: "characters",
       loginButton: "Sign in to my dashboard",
@@ -36,7 +36,7 @@
       subtitle:
         "Sign in with your employee ID or college email to take attendance and review saved records.",
       usernameLabel: "Employee ID or email",
-      usernamePlaceholder: "e.g. BD or teacher@gvpce.ac.in",
+      usernamePlaceholder: "Enter employee ID or email",
       usernameAutocomplete: "username",
       autocapitalize: "none",
       loginButton: "Open faculty dashboard",
