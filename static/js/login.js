@@ -55,9 +55,9 @@
       badge: "Admin console",
       heading: "Welcome back, Administrator.",
       subtitle:
-        "Sign in with your admin username (e.g. ISP or principal) to manage the attendance portal.",
+        "Sign in with your authorized admin credentials to manage the attendance portal.",
       usernameLabel: "Admin username",
-      usernamePlaceholder: "e.g. ISP or principal",
+      usernamePlaceholder: "Enter admin username",
       usernameAutocomplete: "username",
       autocapitalize: "none",
       loginButton: "Open admin console",
