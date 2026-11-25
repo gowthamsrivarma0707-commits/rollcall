@@ -3529,7 +3529,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
                     period = int(row["period"])
                     span = int(row["span"])
                     period_label = f"P{period}" if span == 1 else f"P{period}–P{period + span - 1}"
-                    session_headers.append(f"{day.strftime('%d %b')}\\n{period_label}")
+                    session_headers.append(f"{day.strftime('%d %b')}\n{period_label}")
                 for col, label in enumerate(base_headers + session_headers + ["Attended", "Total", "Attendance %"], start=1):
                     cell = ws.cell(row=header_row, column=col, value=label)
                     cell.font = white_bold
@@ -3628,7 +3628,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
                         ws.cell(
                             row=row_idx,
                             column=total_col,
-                            value=f"=SUMIF({first_letter}{row_idx}:{last_letter}{row_idx}, '>=0', ${span_start_letter}${span_row}:${span_end_letter}${span_row})",
+                            value=f"=SUM(${span_start_letter}${span_row}:${span_end_letter}${span_row})",
                         ).number_format = "0"
                         ws.cell(
                             row=row_idx,
