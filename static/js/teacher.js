@@ -710,7 +710,7 @@ const state = {
      View switching
      --------------------------------------------------------- */
   function switchView(view, { autoLoad = true, scroll = true } = {}) {
-    if (!["overview", "mark", "records", "students"].includes(view)) return;
+    if (!["overview", "mark", "records", "students", "electives"].includes(view)) return;
     state.view = view;
 
     document.querySelectorAll(".teacher-view").forEach((section) => {
@@ -726,6 +726,7 @@ const state = {
 
     if (view === "records" && autoLoad) loadRecords();
     if (view === "students" && autoLoad && !state.studentsLoaded) loadStudents();
+    if (view === "electives" && autoLoad) loadElectives();
     if (view === "mark" && autoLoad) {
       if (!state.selected) {
         selectFirstMarkable($("markDate").value || state.today);
@@ -1754,6 +1755,37 @@ const state = {
         if ($("btnImportText")) $("btnImportText").textContent = "Start Import";
       }
     });
+
+    $("tabEnrolledStudents")?.addEventListener("click", () => {
+      $("tabEnrolledStudents").classList.add("is-active");
+      $("tabAddStudents").classList.remove("is-active");
+      $("paneEnrolledStudents").hidden = false;
+      $("paneAddStudents").hidden = true;
+    });
+
+    $("tabAddStudents")?.addEventListener("click", () => {
+      $("tabAddStudents").classList.add("is-active");
+      $("tabEnrolledStudents").classList.remove("is-active");
+      $("paneAddStudents").hidden = false;
+      $("paneEnrolledStudents").hidden = true;
+    });
+
+    $("rosterEnrolledSearch")?.addEventListener("input", (e) => {
+      renderEnrolledRoster(e.target.value);
+    });
+
+    $("rosterAddSearch")?.addEventListener("input", (e) => {
+      renderAvailableRoster(e.target.value, activeRosterSection);
+    });
+
+    $("rosterSectionPills")?.addEventListener("click", (e) => {
+      const pill = e.target.closest(".section-pill");
+      if (!pill) return;
+      $("rosterSectionPills").querySelectorAll(".section-pill").forEach((p) => p.classList.remove("is-active"));
+      pill.classList.add("is-active");
+      activeRosterSection = pill.dataset.sec;
+      renderAvailableRoster($("rosterAddSearch").value, activeRosterSection);
+    });
   }
 
   function populateStudentsSubjects(classId, preferredSubject = "") {
@@ -1938,6 +1970,269 @@ const state = {
     } finally {
       setButtonLoading(button, false);
       if (label) label.textContent = "Download Excel";
+    }
+  }
+
+  /* ---------------------------------------------------------
+     Electives (Semester 2) Management
+     --------------------------------------------------------- */
+  state.electives = [];
+  state.currentElective = null;
+  state.electiveRosterData = null;
+  let activeRosterSection = "all";
+
+  async function loadElectives() {
+    const grid = $("electivesGrid");
+    if (!grid) return;
+    grid.innerHTML = '<div class="skeleton-card" style="height:180px"></div><div class="skeleton-card" style="height:180px"></div>';
+    try {
+      const response = await fetch("/api/electives");
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.message || "Failed to load electives.");
+      state.electives = data.electives || [];
+      renderElectiveCards(state.electives);
+    } catch (err) {
+      grid.innerHTML = `<div class="empty-state"><p>${escapeHtml(err.message)}</p></div>`;
+    }
+  }
+
+  function renderElectiveCards(electives) {
+    const grid = $("electivesGrid");
+    if (!grid) return;
+    if (!electives.length) {
+      grid.innerHTML = '<div class="empty-state"><p>No electives scheduled for Semester 2.</p></div>';
+      return;
+    }
+    grid.innerHTML = electives
+      .map((el) => {
+        const pct = Math.min(100, Math.round((el.enrolled_count / (el.capacity || 35)) * 100));
+        return `
+        <article class="elective-card">
+          <div>
+            <div class="elective-card__head">
+              <span class="section-tag">${escapeHtml(el.code)}</span>
+              <span class="live-pill">Sem ${el.semester}</span>
+            </div>
+            <h3 class="elective-card__title">${escapeHtml(el.name)}</h3>
+            <div class="elective-card__faculty">
+              <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
+              <span>Faculty: <strong>${escapeHtml(el.teacher_name)}</strong></span>
+            </div>
+          </div>
+
+          <div class="elective-card__stats">
+            <div class="elective-card__count-row">
+              <span>Enrolled Students</span>
+              <strong>${el.enrolled_count} / ${el.capacity}</strong>
+            </div>
+            <div class="elective-bar-track">
+              <div class="elective-bar-fill" style="width: ${pct}%"></div>
+            </div>
+          </div>
+
+          <div class="elective-card__foot">
+            <button class="btn btn--dark btn--small" type="button" data-manage-elective="${el.id}">
+              Manage Roster →
+            </button>
+          </div>
+        </article>
+      `;
+      })
+      .join("");
+
+    grid.querySelectorAll("[data-manage-elective]").forEach((btn) => {
+      btn.addEventListener("click", () => openElectiveRoster(parseInt(btn.dataset.manageElective, 10)));
+    });
+  }
+
+  async function openElectiveRoster(electiveId) {
+    const modal = $("modalElectiveRoster");
+    if (!modal) return;
+    modal.hidden = false;
+
+    $("tabEnrolledStudents").classList.add("is-active");
+    $("tabAddStudents").classList.remove("is-active");
+    $("paneEnrolledStudents").hidden = false;
+    $("paneAddStudents").hidden = true;
+    $("rosterEnrolledSearch").value = "";
+    $("rosterAddSearch").value = "";
+    activeRosterSection = "all";
+
+    $("rosterSectionPills")?.querySelectorAll(".section-pill").forEach((p) => {
+      p.classList.toggle("is-active", p.dataset.sec === "all");
+    });
+
+    $("enrolledStudentsList").innerHTML = '<div style="padding:20px; text-align:center;">Loading roster…</div>';
+    $("availableStudentsList").innerHTML = '<div style="padding:20px; text-align:center;">Loading students…</div>';
+
+    try {
+      const response = await fetch(`/api/electives/${electiveId}/students`);
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.message || "Failed to load elective students.");
+      state.currentElective = data.elective;
+      state.electiveRosterData = data;
+
+      $("modalElectiveCode").textContent = data.elective.code;
+      $("modalElectiveTitle").textContent = data.elective.name;
+      $("modalElectiveTeacher").textContent = `Faculty In-Charge: ${data.elective.teacher_name} · Capacity: ${data.elective.capacity}`;
+      $("modalEnrolledCount").textContent = data.enrolled_students.length;
+
+      renderEnrolledRoster();
+      renderAvailableRoster();
+    } catch (err) {
+      toast(err.message, "error");
+    }
+  }
+
+  function renderEnrolledRoster(filterText = "") {
+    const container = $("enrolledStudentsList");
+    if (!container || !state.electiveRosterData) return;
+    const enrolled = state.electiveRosterData.enrolled_students || [];
+    const query = filterText.trim().toLowerCase();
+    const filtered = enrolled.filter(
+      (s) => !query || s.name.toLowerCase().includes(query) || s.register_no.toLowerCase().includes(query)
+    );
+
+    if (!filtered.length) {
+      container.innerHTML = `<div style="padding:24px; text-align:center; color:var(--text-muted); font-size:13px;">${
+        enrolled.length ? "No enrolled students match your search." : "No students enrolled in this elective yet. Click '+ Enroll Students' to add."
+      }</div>`;
+      return;
+    }
+
+    container.innerHTML = filtered
+      .map(
+        (s) => `
+      <div class="roster-student-item">
+        <div class="roster-student-info">
+          <span class="roster-student-avatar">${escapeHtml(s.name.slice(0, 2).toUpperCase())}</span>
+          <div class="roster-student-details">
+            <strong>${escapeHtml(s.name)}</strong>
+            <small>
+              <span>${escapeHtml(s.register_no)}</span>
+              <span class="section-tag">${escapeHtml(s.class_code || "MCA")}</span>
+              <span class="enrolled-here-pill">✓ Enrolled</span>
+            </small>
+          </div>
+        </div>
+        <button class="btn-remove-student" type="button" data-unenroll-student="${s.id}" data-student-name="${escapeHtml(s.name)}">
+          Remove ✕
+        </button>
+      </div>
+    `
+      )
+      .join("");
+
+    container.querySelectorAll("[data-unenroll-student]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const studentId = parseInt(btn.dataset.unenrollStudent, 10);
+        const studentName = btn.dataset.studentName;
+        if (confirm(`Remove ${studentName} from this elective?`)) {
+          unenrollStudent(state.currentElective.id, studentId);
+        }
+      });
+    });
+  }
+
+  function renderAvailableRoster(filterText = "", secFilter = activeRosterSection) {
+    const container = $("availableStudentsList");
+    if (!container || !state.electiveRosterData) return;
+    const available = state.electiveRosterData.available_students || [];
+    const query = filterText.trim().toLowerCase();
+
+    const filtered = available.filter((s) => {
+      if (secFilter !== "all" && s.class_code !== secFilter) return false;
+      if (query && !s.name.toLowerCase().includes(query) && !s.register_no.toLowerCase().includes(query)) return false;
+      return true;
+    });
+
+    if (!filtered.length) {
+      container.innerHTML = `<div style="padding:24px; text-align:center; color:var(--text-muted); font-size:13px;">No matching students found.</div>`;
+      return;
+    }
+
+    container.innerHTML = filtered
+      .map((s) => {
+        let actionHtml = "";
+        let badgeHtml = "";
+        if (s.is_enrolled_here) {
+          badgeHtml = '<span class="enrolled-here-pill">✓ Enrolled Here</span>';
+          actionHtml = `<button class="btn-remove-student" type="button" data-unenroll-student="${s.id}" data-student-name="${escapeHtml(s.name)}">Remove</button>`;
+        } else if (!s.can_enroll) {
+          badgeHtml = `<span class="conflict-pill" title="Student is already taking another elective">Enrolled in ${escapeHtml(s.conflict_elective || "another elective")}</span>`;
+          actionHtml = `<button class="btn-enroll-student" type="button" disabled title="1 student can only take 1 elective">Locked</button>`;
+        } else {
+          actionHtml = `<button class="btn-enroll-student" type="button" data-enroll-student="${s.id}">+ Enroll</button>`;
+        }
+
+        return `
+        <div class="roster-student-item">
+          <div class="roster-student-info">
+            <span class="roster-student-avatar">${escapeHtml(s.name.slice(0, 2).toUpperCase())}</span>
+            <div class="roster-student-details">
+              <strong>${escapeHtml(s.name)}</strong>
+              <small>
+                <span>${escapeHtml(s.register_no)}</span>
+                <span class="section-tag">${escapeHtml(s.class_code)}</span>
+                ${badgeHtml}
+              </small>
+            </div>
+          </div>
+          ${actionHtml}
+        </div>
+      `;
+      })
+      .join("");
+
+    container.querySelectorAll("[data-enroll-student]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const studentId = parseInt(btn.dataset.enrollStudent, 10);
+        enrollStudent(state.currentElective.id, studentId);
+      });
+    });
+
+    container.querySelectorAll("[data-unenroll-student]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const studentId = parseInt(btn.dataset.unenrollStudent, 10);
+        const studentName = btn.dataset.studentName;
+        if (confirm(`Remove ${studentName} from this elective?`)) {
+          unenrollStudent(state.currentElective.id, studentId);
+        }
+      });
+    });
+  }
+
+  async function enrollStudent(electiveId, studentId) {
+    try {
+      const response = await fetch(`/api/electives/${electiveId}/enroll`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ student_id: studentId }),
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.message || "Failed to enroll student.");
+      toast(data.message, "success");
+      await openElectiveRoster(electiveId);
+      loadElectives();
+    } catch (err) {
+      toast(err.message, "error");
+    }
+  }
+
+  async function unenrollStudent(electiveId, studentId) {
+    try {
+      const response = await fetch(`/api/electives/${electiveId}/unenroll`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ student_id: studentId }),
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.message || "Failed to remove student.");
+      toast(data.message, "success");
+      await openElectiveRoster(electiveId);
+      loadElectives();
+    } catch (err) {
+      toast(err.message, "error");
     }
   }
 
@@ -2137,6 +2432,10 @@ const state = {
         date: editButton.dataset.date,
         period: Number(editButton.dataset.period),
       });
+    }
+
+    if (event.target.closest("[data-close-modal]")) {
+      document.querySelectorAll(".modal-backdrop").forEach((m) => (m.hidden = true));
     }
   });
 

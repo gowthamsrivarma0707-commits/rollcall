@@ -207,6 +207,22 @@ CREATE TABLE IF NOT EXISTS sessions (
     expires_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS electives (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    code        TEXT NOT NULL UNIQUE,
+    name        TEXT NOT NULL,
+    semester    INTEGER NOT NULL DEFAULT 2,
+    teacher_id  INTEGER REFERENCES teachers(id),
+    capacity    INTEGER NOT NULL DEFAULT 35
+);
+
+CREATE TABLE IF NOT EXISTS elective_enrollments (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    elective_id INTEGER NOT NULL REFERENCES electives(id) ON DELETE CASCADE,
+    student_id  INTEGER NOT NULL UNIQUE REFERENCES students(id) ON DELETE CASCADE,
+    enrolled_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_students_class
     ON students(class_id);
 CREATE INDEX IF NOT EXISTS idx_assignments_teacher
@@ -219,6 +235,10 @@ CREATE INDEX IF NOT EXISTS idx_records_student
     ON attendance_records(student_id);
 CREATE INDEX IF NOT EXISTS idx_timetable_class
     ON timetable(class_id, weekday);
+CREATE INDEX IF NOT EXISTS idx_elective_enrollments_student
+    ON elective_enrollments(student_id);
+CREATE INDEX IF NOT EXISTS idx_elective_enrollments_elective
+    ON elective_enrollments(elective_id);
 """
 
 class ApiError(Exception):
@@ -303,6 +323,22 @@ def init_db(reset: bool = False) -> None:
 
         # Remove deprecated Administrator account if present
         conn.execute("DELETE FROM admins WHERE username = 'Administrator' COLLATE NOCASE")
+
+        # Ensure default Sem-2 Electives are present
+        elective_cnt = conn.execute("SELECT COUNT(*) FROM electives").fetchone()[0]
+        if elective_cnt == 0:
+            teachers_map = {row["employee_id"]: row["id"] for row in conn.execute("SELECT id, employee_id FROM teachers").fetchall()}
+            sample_electives = [
+                ("MCA-E1-CC", "Cloud Computing & Virtualization", 2, teachers_map.get("RK"), 35),
+                ("MCA-E1-CSF", "Cyber Security & Digital Forensics", 2, teachers_map.get("CHSSRP"), 35),
+                ("MCA-E1-DL", "Deep Learning & Neural Networks", 2, teachers_map.get("PRP"), 35),
+                ("MCA-E1-BDA", "Big Data Analytics & Frameworks", 2, teachers_map.get("VL"), 35),
+            ]
+            for e_code, e_name, e_sem, e_tid, e_cap in sample_electives:
+                conn.execute(
+                    "INSERT INTO electives (code, name, semester, teacher_id, capacity) VALUES (?, ?, ?, ?, ?)",
+                    (e_code, e_name, e_sem, e_tid, e_cap),
+                )
 
 
 def _all_teachers() -> list[sqlite3.Row]:
@@ -1221,6 +1257,19 @@ class RollCallHandler(BaseHTTPRequestHandler):
             )
             return
 
+        if path == "/api/electives":
+            session, is_admin = self._require_staff_session()
+            self._get_electives(session["user_id"], is_admin=is_admin, head_only=head_only)
+            return
+
+        if path.startswith("/api/electives/") and path.endswith("/students"):
+            session, is_admin = self._require_staff_session()
+            parts = path.split("/")
+            if len(parts) >= 5 and parts[3].isdigit():
+                elective_id = int(parts[3])
+                self._get_elective_students(elective_id, session["user_id"], is_admin=is_admin, head_only=head_only)
+                return
+
         if path == "/api/teacher/students/export":
             session, is_admin = self._require_staff_session()
             retry = export_limiter.hit(
@@ -1311,6 +1360,20 @@ class RollCallHandler(BaseHTTPRequestHandler):
         if path == "/api/admin/students/import":
             self._import_students()
             return
+        if path.startswith("/api/electives/") and path.endswith("/enroll"):
+            session, is_admin = self._require_staff_session()
+            parts = path.split("/")
+            if len(parts) >= 5 and parts[3].isdigit():
+                elective_id = int(parts[3])
+                self._enroll_elective_student(elective_id, session, is_admin)
+                return
+        if path.startswith("/api/electives/") and path.endswith("/unenroll"):
+            session, is_admin = self._require_staff_session()
+            parts = path.split("/")
+            if len(parts) >= 5 and parts[3].isdigit():
+                elective_id = int(parts[3])
+                self._unenroll_elective_student(elective_id, session, is_admin)
+                return
         raise ApiError(404, "API endpoint not found.")
 
     def _login(self) -> None:
@@ -2991,6 +3054,191 @@ class RollCallHandler(BaseHTTPRequestHandler):
                 "total_imported": imported_count,
                 "skipped": skipped_count,
                 "by_class": dict(by_class_summary),
+            })
+
+    def _get_electives(self, user_id: int, *, is_admin: bool, head_only: bool = False) -> None:
+        with get_db() as conn:
+            rows = conn.execute(
+                """
+                SELECT e.id, e.code, e.name, e.semester, e.capacity, e.teacher_id,
+                       t.name AS teacher_name, t.employee_id AS teacher_employee_id,
+                       COUNT(ee.id) AS enrolled_count
+                FROM electives e
+                LEFT JOIN teachers t ON t.id = e.teacher_id
+                LEFT JOIN elective_enrollments ee ON ee.elective_id = e.id
+                GROUP BY e.id
+                ORDER BY e.code
+                """
+            ).fetchall()
+            electives = []
+            for r in rows:
+                electives.append({
+                    "id": int(r["id"]),
+                    "code": r["code"],
+                    "name": r["name"],
+                    "semester": int(r["semester"]),
+                    "capacity": int(r["capacity"]),
+                    "teacher_id": int(r["teacher_id"]) if r["teacher_id"] else None,
+                    "teacher_name": r["teacher_name"] or "Faculty Not Assigned",
+                    "teacher_employee_id": r["teacher_employee_id"] or "",
+                    "enrolled_count": int(r["enrolled_count"]),
+                    "can_manage": True,
+                })
+            self._send_json({"ok": True, "electives": electives}, head_only=head_only)
+
+    def _get_elective_students(self, elective_id: int, user_id: int, *, is_admin: bool, head_only: bool = False) -> None:
+        with get_db() as conn:
+            elective = conn.execute(
+                """
+                SELECT e.id, e.code, e.name, e.semester, e.capacity, e.teacher_id,
+                       t.name AS teacher_name, t.employee_id AS teacher_employee_id
+                FROM electives e
+                LEFT JOIN teachers t ON t.id = e.teacher_id
+                WHERE e.id = ?
+                """,
+                (elective_id,),
+            ).fetchone()
+            if not elective:
+                raise ApiError(404, "Elective not found.")
+
+            enrolled_rows = conn.execute(
+                """
+                SELECT s.id, s.register_no, s.name, s.class_id, c.code AS class_code, ee.enrolled_at
+                FROM elective_enrollments ee
+                JOIN students s ON s.id = ee.student_id
+                JOIN classes c ON c.id = s.class_id
+                WHERE ee.elective_id = ?
+                ORDER BY s.register_no
+                """,
+                (elective_id,),
+            ).fetchall()
+
+            all_students_rows = conn.execute(
+                """
+                SELECT s.id, s.register_no, s.name, s.class_id, c.code AS class_code,
+                       ee.elective_id AS enrolled_elective_id,
+                       el.code AS enrolled_elective_code,
+                       el.name AS enrolled_elective_name
+                FROM students s
+                JOIN classes c ON c.id = s.class_id
+                LEFT JOIN elective_enrollments ee ON ee.student_id = s.id
+                LEFT JOIN electives el ON el.id = ee.elective_id
+                WHERE s.active = 1
+                ORDER BY s.class_id, s.register_no
+                """
+            ).fetchall()
+
+            available_students = []
+            for r in all_students_rows:
+                is_here = r["enrolled_elective_id"] == elective_id
+                enrolled_elsewhere = (
+                    r["enrolled_elective_id"] is not None and r["enrolled_elective_id"] != elective_id
+                )
+                available_students.append({
+                    "id": int(r["id"]),
+                    "register_no": r["register_no"],
+                    "name": r["name"],
+                    "class_id": int(r["class_id"]),
+                    "class_code": r["class_code"],
+                    "is_enrolled_here": bool(is_here),
+                    "can_enroll": bool(not r["enrolled_elective_id"]),
+                    "conflict_elective": r["enrolled_elective_code"] if enrolled_elsewhere else None,
+                    "conflict_name": r["enrolled_elective_name"] if enrolled_elsewhere else None,
+                })
+
+            self._send_json(
+                {
+                    "ok": True,
+                    "elective": {
+                        "id": int(elective["id"]),
+                        "code": elective["code"],
+                        "name": elective["name"],
+                        "semester": int(elective["semester"]),
+                        "capacity": int(elective["capacity"]),
+                        "teacher_name": elective["teacher_name"] or "Faculty Not Assigned",
+                        "enrolled_count": len(enrolled_rows),
+                    },
+                    "enrolled_students": [dict(r) for r in enrolled_rows],
+                    "available_students": available_students,
+                },
+                head_only=head_only,
+            )
+
+    def _enroll_elective_student(self, elective_id: int, session: dict, is_admin: bool) -> None:
+        payload = self._read_json()
+        student_id = parse_integer(payload.get("student_id"), "Choose a valid student.")
+
+        with get_db() as conn:
+            elective = conn.execute("SELECT id, code, name, capacity FROM electives WHERE id = ?", (elective_id,)).fetchone()
+            if not elective:
+                raise ApiError(404, "Elective not found.")
+
+            student = conn.execute("SELECT id, register_no, name FROM students WHERE id = ? AND active = 1", (student_id,)).fetchone()
+            if not student:
+                raise ApiError(404, "Student not found.")
+
+            curr_count = conn.execute("SELECT COUNT(*) FROM elective_enrollments WHERE elective_id = ?", (elective_id,)).fetchone()[0]
+            if curr_count >= int(elective["capacity"]):
+                raise ApiError(400, f"Cannot enroll: {elective['name']} has reached its capacity limit of {elective['capacity']} students.")
+
+            existing_enrollment = conn.execute(
+                """
+                SELECT ee.id, ee.elective_id, e.code, e.name
+                FROM elective_enrollments ee
+                JOIN electives e ON e.id = ee.elective_id
+                WHERE ee.student_id = ?
+                """,
+                (student_id,),
+            ).fetchone()
+
+            if existing_enrollment:
+                if int(existing_enrollment["elective_id"]) == elective_id:
+                    raise ApiError(400, f"{student['name']} is already enrolled in this elective.")
+                raise ApiError(
+                    400,
+                    f"Enrollment blocked: {student['name']} ({student['register_no']}) is already enrolled in {existing_enrollment['code']} - {existing_enrollment['name']}. "
+                    "Each student is strictly allowed only 1 elective. Remove them from their existing elective first to switch."
+                )
+
+            now_iso = datetime.now().isoformat(timespec="seconds")
+            conn.execute(
+                "INSERT INTO elective_enrollments (elective_id, student_id, enrolled_at) VALUES (?, ?, ?)",
+                (elective_id, student_id, now_iso),
+            )
+            audit(conn, session["role"], session["user_id"], "enroll_elective", f"{student['register_no']} into {elective['code']}")
+            conn.commit()
+
+            self._send_json({
+                "ok": True,
+                "message": f"Successfully enrolled {student['name']} ({student['register_no']}) into {elective['name']}.",
+            })
+
+    def _unenroll_elective_student(self, elective_id: int, session: dict, is_admin: bool) -> None:
+        payload = self._read_json()
+        student_id = parse_integer(payload.get("student_id"), "Choose a valid student.")
+
+        with get_db() as conn:
+            elective = conn.execute("SELECT id, code, name FROM electives WHERE id = ?", (elective_id,)).fetchone()
+            if not elective:
+                raise ApiError(404, "Elective not found.")
+
+            student = conn.execute("SELECT id, register_no, name FROM students WHERE id = ?", (student_id,)).fetchone()
+            if not student:
+                raise ApiError(404, "Student not found.")
+
+            cur = conn.execute(
+                "DELETE FROM elective_enrollments WHERE elective_id = ? AND student_id = ?",
+                (elective_id, student_id),
+            )
+            if cur.rowcount == 0:
+                raise ApiError(400, "Student was not enrolled in this elective.")
+
+            audit(conn, session["role"], session["user_id"], "unenroll_elective", f"Removed {student['register_no']} from {elective['code']}")
+            conn.commit()
+
+            self._send_json({
+                "ok": True,
+                "message": f"Removed {student['name']} ({student['register_no']}) from {elective['name']}.",
             })
 
     def _teacher_sessions(self, teacher_id: int, query: dict, *, admin: bool = False) -> dict:

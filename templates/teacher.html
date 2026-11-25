@@ -34,6 +34,7 @@
         <button class="app-tab" type="button" data-view="mark">Take attendance</button>
         <button class="app-tab" type="button" data-view="records">Records</button>
         <button class="app-tab" type="button" data-view="students">Students</button>
+        <button class="app-tab" type="button" data-view="electives">⚡ Electives (Sem 2)</button>
       </nav>
 
       <div class="app-header__actions">
@@ -484,7 +485,86 @@
         </div>
       </section>
     </section>
+
+    <!-- ELECTIVES (SEM 2) -->
+    <section class="teacher-view" id="view-electives" hidden>
+      <div class="welcome-row welcome-row--teacher">
+        <div>
+          <p class="eyebrow">SEMESTER 2 · ELECTIVE SUBJECTS</p>
+          <h1>Electives Management</h1>
+          <p class="welcome-sub">Assign students to their chosen elective subject for MCA Semester 2.</p>
+        </div>
+      </div>
+
+      <div class="card electives-banner-card">
+        <div class="electives-banner__icon">⚡</div>
+        <div class="electives-banner__text">
+          <strong>Strict College Policy: 1 Student = 1 Elective Only</strong>
+          <p>Each student from MCA General or MCA AI can only be enrolled in one elective subject. Once enrolled in an elective, the student is automatically locked from other electives to prevent double-registration. To change a student's elective, remove them from their current elective first.</p>
+        </div>
+      </div>
+
+      <div class="electives-grid" id="electivesGrid">
+        <div class="skeleton-card" style="height:200px"></div>
+        <div class="skeleton-card" style="height:200px"></div>
+      </div>
+    </section>
   </main>
+
+  <!-- MODAL: ELECTIVE ROSTER -->
+  <div class="modal-backdrop" id="modalElectiveRoster" hidden>
+    <div class="modal-card modal-card--large" role="dialog" aria-modal="true" aria-labelledby="modalElectiveTitle">
+      <div class="modal-head">
+        <div>
+          <span class="section-tag" id="modalElectiveCode">MCA-E1</span>
+          <h3 id="modalElectiveTitle" style="margin-top:4px;">Elective Roster</h3>
+          <small id="modalElectiveTeacher" style="color:var(--text-muted); font-size:13px;">Faculty: Loading…</small>
+        </div>
+        <button class="modal-close" type="button" data-close-modal aria-label="Close modal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="elective-tabs">
+          <button class="elective-tab is-active" id="tabEnrolledStudents" type="button">
+            Enrolled Students (<span id="modalEnrolledCount">0</span>)
+          </button>
+          <button class="elective-tab" id="tabAddStudents" type="button">
+            + Enroll Students
+          </button>
+        </div>
+
+        <!-- PANE 1: ENROLLED STUDENTS -->
+        <div id="paneEnrolledStudents" class="elective-pane">
+          <div class="roster-toolbar">
+            <input id="rosterEnrolledSearch" type="search" placeholder="Search enrolled students…" autocomplete="off">
+          </div>
+          <div class="elective-students-list" id="enrolledStudentsList">
+            <div class="skeleton skeleton--row"></div>
+          </div>
+        </div>
+
+        <!-- PANE 2: ADD STUDENTS -->
+        <div id="paneAddStudents" class="elective-pane" hidden>
+          <div class="roster-toolbar">
+            <input id="rosterAddSearch" type="search" placeholder="Search student by name or roll number…" autocomplete="off">
+            <div class="section-pills-bar" id="rosterSectionPills">
+              <button type="button" class="section-pill is-active" data-sec="all">All</button>
+              <button type="button" class="section-pill" data-sec="MCA-GEN">MCA-GEN</button>
+              <button type="button" class="section-pill" data-sec="MCA-AI">MCA-AI</button>
+            </div>
+          </div>
+          <p class="elective-info-hint">Showing available students. Students already in another elective are marked and cannot be selected.</p>
+          <div class="elective-students-list" id="availableStudentsList">
+            <div class="skeleton skeleton--row"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn btn--ghost" type="button" data-close-modal>Close</button>
+      </div>
+    </div>
+  </div>
 
   <script src="/static/js/common.js"></script>
   <script src="/static/js/default_roster.js"></script>
