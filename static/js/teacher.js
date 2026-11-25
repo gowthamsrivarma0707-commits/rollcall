@@ -357,7 +357,11 @@ const state = {
       state.data = data;
       state.classes = data.classes || [];
       state.assignments = data.assignments || [];
+      state.timetablesByClass = data.timetables_by_class || {};
       state.timetable = data.timetable || [];
+      if (state.selectedClassId && state.timetablesByClass[state.selectedClassId]) {
+        state.timetable = state.timetablesByClass[state.selectedClassId];
+      }
       state.today = data.server_date;
       state.todaySlots = data.today ? data.today.slots : [];
       applyHolidayFlags();
@@ -747,6 +751,13 @@ const state = {
       toast("No classes are assigned to your account yet.", "error");
       return;
     }
+    state.selectedClassId = targetClass;
+    if ($("markClassSelect")) {
+      $("markClassSelect").value = String(targetClass);
+    }
+    if (state.timetablesByClass && state.timetablesByClass[targetClass]) {
+      state.timetable = state.timetablesByClass[targetClass];
+    }
 
     let targetDate = date || state.today;
     let slot = null;
@@ -812,11 +823,20 @@ const state = {
     const classSelect = $("markClassSelect");
     if (classSelect) {
       classSelect.innerHTML = state.classes
-        .map((c) => `<option value="${c.id}">${escapeHTML(c.name || c.code)}</option>`)
+        .map((c) => `<option value="${c.id}">${escapeHTML(c.code)} · ${escapeHTML(c.name)} (${c.student_count || 0} students)</option>`)
         .join("");
+      if (state.selectedClassId) {
+        classSelect.value = String(state.selectedClassId);
+      }
       classSelect.addEventListener("change", () => {
+        state.selectedClassId = Number(classSelect.value);
+        if (state.timetablesByClass && state.timetablesByClass[state.selectedClassId]) {
+          state.timetable = state.timetablesByClass[state.selectedClassId];
+        }
+        setRosterPrompt(`Section ${classSelect.selectedOptions[0]?.text || ""}. Choose a period above.`);
+        renderMarkSlots();
         if (state.selected) {
-          state.selected.classId = Number(classSelect.value);
+          state.selected.classId = state.selectedClassId;
           loadRoster();
         }
       });
@@ -1557,14 +1577,183 @@ const state = {
   function initializeStudentsControls() {
     const classFilter = $("studentsClassFilter");
     if (!classFilter) return;
+    const totalStudents = state.classes.reduce((sum, c) => sum + (c.student_count || 0), 0);
     const options = [
+      optionMarkup("all", `All Sections · ${totalStudents} students`),
       ...state.classes.map((classItem) =>
-        optionMarkup(classItem.id, `${classItem.code} · ${classItem.name}`)
+        optionMarkup(classItem.id, `${classItem.code} · ${classItem.name} (${classItem.student_count || 0})`)
       ),
-      optionMarkup("all", "All Sections (General + AI)"),
     ];
     classFilter.innerHTML = options.join("");
+    classFilter.value = "all";
+    renderStudentSectionPills();
     populateStudentsSubjects(classFilter.value || "");
+    initializeAdminModals();
+  }
+
+  function renderStudentSectionPills() {
+    const container = $("studentSectionPills");
+    if (!container) return;
+    const activeVal = $("studentsClassFilter") ? $("studentsClassFilter").value : "all";
+    const totalStudents = state.classes.reduce((sum, c) => sum + (c.student_count || 0), 0);
+    const pills = [
+      { id: "all", label: `All Sections (${totalStudents})` },
+      ...state.classes.map((c) => ({ id: String(c.id), label: `${c.code} (${c.student_count || 0})` })),
+    ];
+
+    container.innerHTML = pills
+      .map(
+        (p) => `
+        <button type="button" class="section-pill ${activeVal === p.id ? "is-active" : ""}" data-section-pill="${p.id}">
+          ${escapeHTML(p.label)}
+        </button>`
+      )
+      .join("");
+  }
+
+  function initializeAdminModals() {
+    const studentClassSelect = $("newStudentClass");
+    if (studentClassSelect && state.classes) {
+      studentClassSelect.innerHTML = state.classes
+        .map((c) => `<option value="${c.id}">${escapeHTML(c.code)} · ${escapeHTML(c.name)}</option>`)
+        .join("");
+    }
+
+    $("openAddStudentModal")?.addEventListener("click", () => {
+      $("modalAddStudent").hidden = false;
+      $("newStudentName")?.focus();
+    });
+
+    $("openAddFacultyModal")?.addEventListener("click", () => {
+      $("modalAddFaculty").hidden = false;
+      $("newTeacherName")?.focus();
+    });
+
+    $("openImportModal")?.addEventListener("click", () => {
+      $("modalImportStudents").hidden = false;
+    });
+
+    document.querySelectorAll("[data-close-modal]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".modal-backdrop").forEach((m) => (m.hidden = true));
+      });
+    });
+
+    $("formAddStudent")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const submitBtn = $("btnSubmitAddStudent");
+      setButtonLoading(submitBtn, true);
+      try {
+        const res = await api.post("/api/admin/student/add", {
+          name: $("newStudentName").value.trim(),
+          register_no: $("newStudentRegNo").value.trim(),
+          class_id: $("newStudentClass").value,
+          email: $("newStudentEmail").value.trim(),
+          password: $("newStudentPassword").value.trim() || "student123",
+        });
+        toast(res.message);
+        $("formAddStudent").reset();
+        $("newStudentPassword").value = "student123";
+        $("modalAddStudent").hidden = true;
+        loadDashboard({ silent: true });
+        loadStudents();
+      } catch (err) {
+        toast(err.message, "error");
+      } finally {
+        setButtonLoading(submitBtn, false);
+      }
+    });
+
+    $("formAddFaculty")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const submitBtn = $("btnSubmitAddFaculty");
+      setButtonLoading(submitBtn, true);
+      try {
+        const res = await api.post("/api/admin/teacher/add", {
+          name: $("newTeacherName").value.trim(),
+          employee_id: $("newTeacherEmpId").value.trim(),
+          email: $("newTeacherEmail").value.trim(),
+          department: $("newTeacherDept").value.trim(),
+          password: $("newTeacherPassword").value.trim() || "teacher123",
+        });
+        toast(res.message);
+        $("formAddFaculty").reset();
+        $("newTeacherDept").value = "Computer Applications";
+        $("newTeacherPassword").value = "teacher123";
+        $("modalAddFaculty").hidden = true;
+        loadDashboard({ silent: true });
+      } catch (err) {
+        toast(err.message, "error");
+      } finally {
+        setButtonLoading(submitBtn, false);
+      }
+    });
+
+    const fileInput = $("importFileInput");
+    const statusBox = $("importFileStatus");
+    const importBtn = $("btnSubmitImport");
+    let selectedFile = null;
+
+    fileInput?.addEventListener("change", (e) => {
+      if (e.target.files && e.target.files[0]) {
+        selectedFile = e.target.files[0];
+        setText("importDropLabel", `Selected: ${selectedFile.name} (${Math.round(selectedFile.size / 1024)} KB)`);
+        importBtn.disabled = false;
+        if (statusBox) {
+          statusBox.textContent = "File ready for import. Click 'Start Import' below.";
+          statusBox.hidden = false;
+        }
+      }
+    });
+
+    importBtn?.addEventListener("click", async () => {
+      if (!selectedFile) return;
+      setButtonLoading(importBtn, true);
+      if ($("btnImportText")) $("btnImportText").textContent = "Importing students…";
+
+      try {
+        const isCsv = selectedFile.name.toLowerCase().endsWith(".csv");
+        const reader = new FileReader();
+
+        reader.onload = async () => {
+          try {
+            let payload = {};
+            if (isCsv) {
+              payload = { csv_text: reader.result, filename: selectedFile.name };
+            } else {
+              const base64Str = reader.result.split(",")[1];
+              payload = { file_base64: base64Str, filename: selectedFile.name };
+            }
+
+            const res = await api.post("/api/admin/students/import", payload);
+            toast(res.message);
+            $("modalImportStudents").hidden = true;
+            selectedFile = null;
+            if (fileInput) fileInput.value = "";
+            setText("importDropLabel", "Click to select or drag & drop Excel / CSV file");
+            importBtn.disabled = true;
+            if (statusBox) statusBox.hidden = true;
+            loadDashboard({ silent: true });
+            loadStudents();
+          } catch (err) {
+            toast(err.message, "error");
+          } finally {
+            setButtonLoading(importBtn, false);
+            if ($("btnImportText")) $("btnImportText").textContent = "Start Import";
+          }
+        };
+
+        if (isCsv) {
+          reader.readAsText(selectedFile);
+        } else {
+          reader.readAsDataURL(selectedFile);
+        }
+      } catch (err) {
+        toast(err.message, "error");
+        setButtonLoading(importBtn, false);
+        if ($("btnImportText")) $("btnImportText").textContent = "Start Import";
+      }
+    });
   }
 
   function populateStudentsSubjects(classId, preferredSubject = "") {
@@ -1640,7 +1829,7 @@ const state = {
         const pct = student.total ? formatPercent(student.percentage) : "—";
         return `<tr class="${low ? "is-low" : ""}">
           <td><span class="roster-index">${String(index + 1).padStart(2, "0")}</span></td>
-          <td><span class="table-class">${escapeHTML(student.register_no)}</span></td>
+          <td><span class="table-class">${escapeHTML(student.register_no)}</span>${student.class_code ? ` <span class="section-tag">${escapeHTML(student.class_code)}</span>` : ""}</td>
           <td><span class="table-subject">${escapeHTML(student.name)}</span></td>
           <td><span class="present-summary"><b>${student.attended}</b></span></td>
           <td><span class="present-summary">${student.total}</span></td>
@@ -1909,8 +2098,22 @@ const state = {
   $("refreshRecordsButton")?.addEventListener("click", () => loadRecords());
 
   $("studentsClassFilter")?.addEventListener("change", () => {
+    renderStudentSectionPills();
     populateStudentsSubjects($("studentsClassFilter").value);
     loadStudents();
+  });
+
+  $("studentSectionPills")?.addEventListener("click", (e) => {
+    const pill = e.target.closest("[data-section-pill]");
+    if (!pill) return;
+    const val = pill.dataset.sectionPill;
+    const select = $("studentsClassFilter");
+    if (select) {
+      select.value = val;
+      renderStudentSectionPills();
+      populateStudentsSubjects(val);
+      loadStudents();
+    }
   });
   $("studentsSubjectFilter")?.addEventListener("change", () => loadStudents());
   $("studentsRefreshButton")?.addEventListener("click", () => loadStudents());

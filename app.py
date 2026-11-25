@@ -11,6 +11,7 @@ the sample campus at any time.
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import mimetypes
 import os
@@ -1301,6 +1302,15 @@ class RollCallHandler(BaseHTTPRequestHandler):
             )
             self._send_json(result)
             return
+        if path == "/api/admin/student/add":
+            self._add_student()
+            return
+        if path == "/api/admin/teacher/add":
+            self._add_teacher()
+            return
+        if path == "/api/admin/students/import":
+            self._import_students()
+            return
         raise ApiError(404, "API endpoint not found.")
 
     def _login(self) -> None:
@@ -2110,21 +2120,24 @@ class RollCallHandler(BaseHTTPRequestHandler):
             for class_item in classes
             for subject in class_item["subjects"]
         }
-        if class_id:
-            with get_db() as conn:
-                timetable = timetable_days(conn, class_id)
-        else:
-            timetable = []
-        for day in timetable:
-            for slot in day["slots"]:
-                slot["class_id"] = class_id
-                slot["can_mark"] = True if admin else slot["subject_id"] in subject_ids
-                slot["can_substitute"] = bool(
-                    not admin
-                    and not slot["can_mark"]
-                    and slot["primary_teacher_id"]
-                    and int(slot["primary_teacher_id"]) != teacher_id
-                )
+        timetables_by_class: dict[str, list[dict]] = {}
+        with get_db() as conn:
+            for class_item in classes:
+                cid = class_item["id"]
+                c_tt = timetable_days(conn, cid)
+                for day in c_tt:
+                    for slot in day["slots"]:
+                        slot["class_id"] = cid
+                        slot["can_mark"] = True if admin else slot["subject_id"] in subject_ids
+                        slot["can_substitute"] = bool(
+                            not admin
+                            and not slot["can_mark"]
+                            and slot["primary_teacher_id"]
+                            and int(slot["primary_teacher_id"]) != teacher_id
+                        )
+                timetables_by_class[str(cid)] = c_tt
+
+        timetable = timetables_by_class.get(str(class_id), []) if class_id else []
         today = date.today()
         today_slots: list[dict] = []
         if today.weekday() < 5 and timetable:
@@ -2183,6 +2196,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
             },
             "recent_sessions": recent_sessions,
             "timetable": timetable,
+            "timetables_by_class": timetables_by_class,
             "today": {
                 "date": today.isoformat(),
                 "day": (
@@ -2780,6 +2794,204 @@ class RollCallHandler(BaseHTTPRequestHandler):
             },
         }
 
+    def _add_student(self) -> None:
+        session, is_admin = self._require_staff_session()
+        if not is_admin:
+            raise ApiError(403, "Administrator access required.")
+        payload = self._read_json()
+        name = str(payload.get("name", "")).strip()
+        register_no = str(payload.get("register_no", "")).strip().upper()
+        class_id = parse_integer(payload.get("class_id"), "Choose a valid class / section.")
+        email = str(payload.get("email", "")).strip().lower() or None
+        password = str(payload.get("password", "")).strip() or "student123"
+
+        if not name:
+            raise ApiError(400, "Student name is required.")
+        if not register_no:
+            raise ApiError(400, "Register number is required.")
+        if len(name) > 100 or len(register_no) > 30:
+            raise ApiError(400, "Name or register number is too long.")
+
+        with get_db() as conn:
+            class_row = conn.execute("SELECT id, name, code FROM classes WHERE id = ?", (class_id,)).fetchone()
+            if not class_row:
+                raise ApiError(404, "Selected class does not exist.")
+            existing = conn.execute("SELECT id FROM students WHERE register_no = ? COLLATE NOCASE", (register_no,)).fetchone()
+            if existing:
+                raise ApiError(400, f"A student with register number {register_no} already exists.")
+            cur = conn.execute(
+                """
+                INSERT INTO students (register_no, name, email, password_hash, class_id, active, must_change_password)
+                VALUES (?, ?, ?, ?, ?, 1, 1)
+                """,
+                (register_no, name, email, hash_password(password), class_id),
+            )
+            audit(conn, "admin", session["user_id"], "create_student", f"{register_no} - {name} ({class_row['code']})")
+            conn.commit()
+            self._send_json({
+                "ok": True,
+                "message": f"Student {name} ({register_no}) enrolled into {class_row['code']} successfully.",
+                "student_id": cur.lastrowid,
+            })
+
+    def _add_teacher(self) -> None:
+        session, is_admin = self._require_staff_session()
+        if not is_admin:
+            raise ApiError(403, "Administrator access required.")
+        payload = self._read_json()
+        name = str(payload.get("name", "")).strip()
+        employee_id = str(payload.get("employee_id", "")).strip().upper()
+        email = str(payload.get("email", "")).strip().lower()
+        department = str(payload.get("department", "")).strip() or "Computer Applications"
+        password = str(payload.get("password", "")).strip() or "teacher123"
+
+        if not name or not employee_id or not email:
+            raise ApiError(400, "Faculty name, employee ID, and email are required.")
+
+        with get_db() as conn:
+            existing = conn.execute(
+                "SELECT id FROM teachers WHERE employee_id = ? COLLATE NOCASE OR email = ? COLLATE NOCASE",
+                (employee_id, email),
+            ).fetchone()
+            if existing:
+                raise ApiError(400, f"Faculty with employee ID {employee_id} or email {email} already exists.")
+            cur = conn.execute(
+                """
+                INSERT INTO teachers (employee_id, name, email, password_hash, department, must_change_password)
+                VALUES (?, ?, ?, ?, ?, 1)
+                """,
+                (employee_id, name, email, hash_password(password), department),
+            )
+            audit(conn, "admin", session["user_id"], "create_teacher", f"{employee_id} - {name} ({department})")
+            conn.commit()
+            self._send_json({
+                "ok": True,
+                "message": f"Faculty {name} ({employee_id}) registered successfully.",
+                "teacher_id": cur.lastrowid,
+            })
+
+    def _import_students(self) -> None:
+        session, is_admin = self._require_staff_session()
+        if not is_admin:
+            raise ApiError(403, "Administrator access required.")
+        payload = self._read_json()
+
+        rows_to_process: list[dict] = []
+        if "rows" in payload and isinstance(payload["rows"], list):
+            rows_to_process = payload["rows"]
+        elif "csv_text" in payload:
+            import csv
+            reader = csv.DictReader(io.StringIO(payload["csv_text"]))
+            for r in reader:
+                rows_to_process.append(dict(r))
+        elif "file_base64" in payload:
+            import base64
+            file_bytes = base64.b64decode(payload["file_base64"])
+            filename = str(payload.get("filename", "")).lower()
+            if filename.endswith(".csv"):
+                import csv
+                text = file_bytes.decode("utf-8", errors="ignore")
+                reader = csv.DictReader(io.StringIO(text))
+                for r in reader:
+                    rows_to_process.append(dict(r))
+            else:
+                import openpyxl
+                wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
+                ws = wb.active
+                sheet_rows = list(ws.iter_rows(values_only=True))
+                if sheet_rows:
+                    header = [str(h or "").strip().lower() for h in sheet_rows[0]]
+                    for row in sheet_rows[1:]:
+                        if not any(row):
+                            continue
+                        row_dict = {}
+                        for idx, val in enumerate(row):
+                            if idx < len(header) and header[idx]:
+                                row_dict[header[idx]] = str(val if val is not None else "").strip()
+                        rows_to_process.append(row_dict)
+
+        if not rows_to_process:
+            raise ApiError(400, "No student records found in the uploaded file.")
+
+        with get_db() as conn:
+            classes_map = {row["code"].upper(): row["id"] for row in conn.execute("SELECT id, code FROM classes").fetchall()}
+            imported_count = 0
+            skipped_count = 0
+            by_class_summary: dict[str, int] = defaultdict(int)
+
+            for item in rows_to_process:
+                name = (
+                    item.get("name") or item.get("student_name") or item.get("student name")
+                    or item.get("fullname") or item.get("student") or ""
+                ).strip()
+
+                reg_no = (
+                    item.get("register_no") or item.get("regno") or item.get("roll_no")
+                    or item.get("rollno") or item.get("reg_no") or item.get("htno")
+                    or item.get("pin") or item.get("roll") or item.get("id") or ""
+                ).strip().upper()
+
+                if not reg_no or not name:
+                    skipped_count += 1
+                    continue
+
+                email = (item.get("email") or item.get("mail") or "").strip().lower() or None
+                course_raw = (
+                    item.get("class") or item.get("course") or item.get("branch")
+                    or item.get("section") or item.get("dept") or item.get("department") or ""
+                ).strip().lower()
+
+                target_code = "MCA-GEN"
+                if "ai" in course_raw or "artificial" in course_raw:
+                    target_code = "MCA-AI"
+                elif "bca" in course_raw:
+                    target_code = "BCA"
+                elif "math" in course_raw or "bsc" in course_raw or "b.sc" in course_raw:
+                    target_code = "BSC-MATHS"
+                elif "msc" in course_raw or "m.sc" in course_raw:
+                    target_code = "MSC-CS"
+                elif "mca" in course_raw or "gen" in course_raw:
+                    target_code = "MCA-GEN"
+                elif reg_no.startswith("26PSMCI"):
+                    target_code = "MCA-AI"
+                elif reg_no.startswith("26PSMCA"):
+                    target_code = "MCA-GEN"
+                elif reg_no.startswith("26PSBCA"):
+                    target_code = "BCA"
+                elif reg_no.startswith("26PSBSC"):
+                    target_code = "BSC-MATHS"
+
+                target_class_id = classes_map.get(target_code, classes_map.get("MCA-GEN", 1))
+
+                existing = conn.execute("SELECT id FROM students WHERE register_no = ? COLLATE NOCASE", (reg_no,)).fetchone()
+                if existing:
+                    conn.execute(
+                        "UPDATE students SET name = ?, class_id = ?, active = 1 WHERE id = ?",
+                        (name, target_class_id, existing["id"]),
+                    )
+                else:
+                    conn.execute(
+                        """
+                        INSERT INTO students (register_no, name, email, password_hash, class_id, active, must_change_password)
+                        VALUES (?, ?, ?, ?, ?, 1, 1)
+                        """,
+                        (reg_no, name, email, hash_password("student123"), target_class_id),
+                    )
+                imported_count += 1
+                by_class_summary[target_code] += 1
+
+            audit(conn, "admin", session["user_id"], "import_students", f"Imported {imported_count} students via bulk upload")
+            conn.commit()
+
+            breakdown_str = ", ".join(f"{code}: {cnt}" for code, cnt in by_class_summary.items())
+            self._send_json({
+                "ok": True,
+                "message": f"Successfully imported {imported_count} students ({breakdown_str}).",
+                "total_imported": imported_count,
+                "skipped": skipped_count,
+                "by_class": dict(by_class_summary),
+            })
+
     def _teacher_sessions(self, teacher_id: int, query: dict, *, admin: bool = False) -> dict:
         filters = []
         params: list = []
@@ -2961,10 +3173,11 @@ class RollCallHandler(BaseHTTPRequestHandler):
 
             student_rows = conn.execute(
                 f"""
-                SELECT id, register_no, name
-                FROM students
-                WHERE class_id IN ({placeholders}) AND active = 1
-                ORDER BY class_id, register_no
+                SELECT s.id, s.register_no, s.name, s.class_id, c.code AS class_code, c.name AS class_name
+                FROM students s
+                JOIN classes c ON c.id = s.class_id
+                WHERE s.class_id IN ({placeholders}) AND s.active = 1
+                ORDER BY s.class_id, s.register_no
                 """,
                 target_class_ids,
             ).fetchall()
@@ -3017,6 +3230,9 @@ class RollCallHandler(BaseHTTPRequestHandler):
                         "id": int(row["id"]),
                         "register_no": row["register_no"],
                         "name": row["name"],
+                        "class_id": int(row["class_id"]),
+                        "class_code": row["class_code"],
+                        "class_name": row["class_name"],
                         "attended": detail["attended"],
                         "total": detail["total"],
                         "percentage": detail["percentage"],

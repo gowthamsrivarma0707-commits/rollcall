@@ -266,13 +266,17 @@
 
       <section class="attendance-toolbar card" aria-label="Attendance selection">
         <div class="form-field form-field--compact">
+          <label for="markClassSelect">Class / Section</label>
+          <select id="markClassSelect"></select>
+        </div>
+        <div class="form-field form-field--compact">
           <label for="markDate">Date</label>
           <input id="markDate" type="date">
         </div>
         <button class="btn btn--ghost btn--small toolbar-today" id="markTodayButton" type="button">Today</button>
         <div class="toolbar-note">
           <span class="live-dot"></span>
-          Only scheduled periods<br>can be marked.
+          Select section & period<br>to mark roll call.
         </div>
       </section>
 
@@ -418,13 +422,28 @@
         <div>
           <p class="eyebrow">CLASS MONITOR</p>
           <h2>Student attendance.</h2>
-          <p>Live attendance and percentage against the 75% requirement for every student in the class.</p>
+          <p>Live attendance and percentage across all college sections (General, AI, BCA, B.Sc, M.Sc).</p>
         </div>
-        <button class="btn btn--dark btn--small" id="studentsRefreshButton" type="button">
-          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M17 9a7 7 0 10-2.1 5M17 4v5h-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Refresh
-        </button>
+        <div class="heading-actions">
+          <button class="btn btn--outline btn--small" id="openAddStudentModal" type="button">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            + Add student
+          </button>
+          <button class="btn btn--outline btn--small" id="openAddFacultyModal" type="button">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            + Add faculty
+          </button>
+          <button class="btn btn--dark btn--small" id="openImportModal" type="button">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 13v3a1 1 0 001 1h10a1 1 0 001-1v-3M10 3v10m-3-3l3 3 3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Upload Excel / CSV
+          </button>
+          <button class="btn btn--ghost btn--small" id="studentsRefreshButton" type="button" title="Refresh list">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M17 9a7 7 0 10-2.1 5M17 4v5h-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
       </div>
+
+      <div class="section-pills-bar" id="studentSectionPills"></div>
 
       <section class="records-filter card" aria-label="Filter students">
         <div class="form-field form-field--compact">
@@ -466,6 +485,110 @@
         </div>
       </section>
     </section>
+
+    <!-- MODAL: ADD STUDENT -->
+    <div class="modal-backdrop" id="modalAddStudent" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalAddStudentTitle">
+        <div class="modal-head">
+          <h3 id="modalAddStudentTitle">Add New Student</h3>
+          <button class="modal-close" type="button" data-close-modal aria-label="Close modal">✕</button>
+        </div>
+        <form id="formAddStudent" class="modal-body">
+          <div class="form-field">
+            <label for="newStudentName">Student Full Name *</label>
+            <input id="newStudentName" type="text" placeholder="e.g. Rahul Sharma" required>
+          </div>
+          <div class="form-field">
+            <label for="newStudentRegNo">Register Number / Roll Number *</label>
+            <input id="newStudentRegNo" type="text" placeholder="e.g. 26PSMCA0070" autocapitalize="characters" required>
+          </div>
+          <div class="form-field">
+            <label for="newStudentClass">Section / Course *</label>
+            <select id="newStudentClass" required></select>
+          </div>
+          <div class="form-field">
+            <label for="newStudentEmail">Email Address (Optional)</label>
+            <input id="newStudentEmail" type="email" placeholder="student@college.edu">
+          </div>
+          <div class="form-field">
+            <label for="newStudentPassword">Initial Password</label>
+            <input id="newStudentPassword" type="text" value="student123">
+            <small class="field-hint">Default is <code>student123</code>. Student can change upon first login.</small>
+          </div>
+          <div class="modal-foot">
+            <button class="btn btn--ghost" type="button" data-close-modal>Cancel</button>
+            <button class="btn btn--dark" id="btnSubmitAddStudent" type="submit">Enroll Student</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL: ADD FACULTY -->
+    <div class="modal-backdrop" id="modalAddFaculty" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalAddFacultyTitle">
+        <div class="modal-head">
+          <h3 id="modalAddFacultyTitle">Register New Faculty</h3>
+          <button class="modal-close" type="button" data-close-modal aria-label="Close modal">✕</button>
+        </div>
+        <form id="formAddFaculty" class="modal-body">
+          <div class="form-field">
+            <label for="newTeacherName">Faculty Full Name *</label>
+            <input id="newTeacherName" type="text" placeholder="e.g. Dr. K. Srinivas" required>
+          </div>
+          <div class="form-field">
+            <label for="newTeacherEmpId">Employee ID / Code *</label>
+            <input id="newTeacherEmpId" type="text" placeholder="e.g. KS or EMP104" autocapitalize="characters" required>
+          </div>
+          <div class="form-field">
+            <label for="newTeacherEmail">College Email Address *</label>
+            <input id="newTeacherEmail" type="email" placeholder="ks@gvpce.ac.in" required>
+          </div>
+          <div class="form-field">
+            <label for="newTeacherDept">Department *</label>
+            <input id="newTeacherDept" type="text" value="Computer Applications" required>
+          </div>
+          <div class="form-field">
+            <label for="newTeacherPassword">Initial Password</label>
+            <input id="newTeacherPassword" type="text" value="teacher123">
+            <small class="field-hint">Default is <code>teacher123</code>.</small>
+          </div>
+          <div class="modal-foot">
+            <button class="btn btn--ghost" type="button" data-close-modal>Cancel</button>
+            <button class="btn btn--dark" id="btnSubmitAddFaculty" type="submit">Register Faculty</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL: BULK IMPORT EXCEL/CSV -->
+    <div class="modal-backdrop" id="modalImportStudents" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalImportTitle">
+        <div class="modal-head">
+          <h3 id="modalImportTitle">Bulk Onboard Students from Excel / CSV</h3>
+          <button class="modal-close" type="button" data-close-modal aria-label="Close modal">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="field-hint">Upload an Excel (<code>.xlsx</code>) or <code>.csv</code> file with student details. Students are automatically sorted into their departments (MCA General, MCA AI, BCA, B.Sc Maths, M.Sc).</p>
+          
+          <label class="upload-dropzone" id="importDropzone" for="importFileInput">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <strong id="importDropLabel">Click to select or drag & drop Excel / CSV file</strong>
+            <small>Supported: .xlsx, .xls, .csv (Name, Roll No, Course/Class columns)</small>
+            <input id="importFileInput" type="file" accept=".xlsx,.xls,.csv" hidden>
+          </label>
+
+          <div id="importFileStatus" style="font-size:13px; font-weight:700; color:var(--green-dark);" hidden></div>
+
+          <div class="modal-foot">
+            <button class="btn btn--ghost" type="button" data-close-modal>Cancel</button>
+            <button class="btn btn--dark" id="btnSubmitImport" type="button" disabled>
+              <span class="btn-spinner" aria-hidden="true"></span>
+              <span class="btn-text" id="btnImportText">Start Import</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script src="/static/js/common.js"></script>

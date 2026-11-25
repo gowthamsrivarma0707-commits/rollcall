@@ -55,6 +55,9 @@ BREAKS = (
 CLASSES = [
     ("MCA-GEN", "1st Year MCA (General)", "2026-27 Admitted Batch"),
     ("MCA-AI", "1st Year MCA (Artificial Intelligence)", "2026-27 Admitted Batch"),
+    ("BCA", "Bachelor of Computer Applications", "2026-27 Admitted Batch"),
+    ("BSC-MATHS", "B.Sc Mathematics", "2026-27 Admitted Batch"),
+    ("MSC-CS", "M.Sc Computer Science", "2026-27 Admitted Batch"),
 ]
 
 SUBJECTS = [
