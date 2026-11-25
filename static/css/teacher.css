@@ -1139,23 +1139,35 @@
   min-width: 0;
 }
 
-.roster-student strong {
+.roster-student strong,
+.roster-student .roster-regno {
   display: block;
   overflow: hidden;
-  color: var(--ink-soft);
-  font-size: 13.5px;
+  color: var(--ink);
+  font-family: var(--font-display), monospace;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.35;
+  letter-spacing: 0.03em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.roster-student span {
+.roster-student span,
+.roster-student .roster-name {
   display: block;
-  margin-top: 1px;
-  color: var(--muted-light);
-  font-size: 12px;
-  letter-spacing: 0.02em;
+  margin-top: 2px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roster-row.is-absent .roster-student .roster-regno {
+  color: var(--danger);
+  font-weight: 800;
 }
 
 .status-toggle {
