@@ -1090,7 +1090,7 @@
 
 .roster-columns {
   display: grid;
-  grid-template-columns: 26px 34px minmax(180px, 1fr) 200px auto;
+  grid-template-columns: 26px 34px minmax(140px, 1fr) auto calc(1fr + 92px);
   align-items: center;
   gap: 16px;
   padding: 12px 28px 9px;
@@ -1106,12 +1106,15 @@
 }
 
 .roster-columns__middle {
+  grid-column: 4;
   text-align: center;
+  justify-self: center;
 }
 
 .roster-columns span:last-child {
+  grid-column: 5;
   text-align: right;
-  padding-right: 18px;
+  justify-self: end;
 }
 
 .roster-list {
@@ -1120,7 +1123,7 @@
 
 .roster-row {
   display: grid;
-  grid-template-columns: 26px 34px minmax(180px, 1fr) 200px auto;
+  grid-template-columns: 26px 34px minmax(140px, 1fr) auto calc(1fr + 92px);
   align-items: center;
   gap: 16px;
   padding: 10px 28px;
@@ -1187,11 +1190,18 @@
 
 /* Roster Middle Badges */
 .roster-middle {
+  grid-column: 4;
   display: flex;
   align-items: center;
   justify-content: center;
+  justify-self: center;
   gap: 8px;
   min-width: 0;
+}
+
+.roster-row .status-toggle {
+  grid-column: 5;
+  justify-self: end;
 }
 
 .roster-pill {
