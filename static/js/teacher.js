@@ -573,7 +573,72 @@ const state = {
           </button>`;
       })
       .join("");
+
+    renderTodayScheduleMini();
   }
+
+  function isTeacherSlot(slot) {
+    if (!slot) return false;
+    const teacher = state.data && state.data.teacher;
+    if (!teacher) return true;
+    if (slot.primary_teacher_id && Number(slot.primary_teacher_id) === Number(teacher.id)) {
+      return true;
+    }
+    if (teacher.employee_id && slot.faculty) {
+      const parts = slot.faculty.split("/").map((s) => s.trim().toUpperCase());
+      if (parts.includes(teacher.employee_id.trim().toUpperCase())) {
+        return true;
+      }
+    }
+    if (!state.data.admin_view && slot.can_mark) {
+      return true;
+    }
+    return false;
+  }
+
+  function renderTodayScheduleMini() {
+    const container = $("todayScheduleMini");
+    if (!container) return;
+    const allSlots = state.todaySlots || [];
+    const mySlots = allSlots.filter(isTeacherSlot);
+    const slots = mySlots.length ? mySlots : (state.data && state.data.admin_view ? allSlots : []);
+
+    if (!slots.length) {
+      container.innerHTML = `
+        <div class="today-sched-empty">
+          <svg viewBox="0 0 20 20" fill="none" width="16" height="16" aria-hidden="true"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span>No classes scheduled for you today.</span>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="today-sched-header">
+        <span>YOUR SCHEDULE TODAY</span>
+        <span class="sched-count">${slots.length} ${plural(slots.length, "class", "classes")}</span>
+      </div>
+      <div class="today-sched-list">
+        ${slots
+          .map((slot) => {
+            const available = slot.can_mark || slot.can_substitute;
+            return `
+              <button class="today-sched-item" type="button"
+                data-today-slot data-subject-id="${slot.subject_id}" data-period="${slot.period}" data-can-mark="${slot.can_mark ? 1 : 0}" data-can-substitute="${slot.can_substitute ? 1 : 0}">
+                <div class="sched-item__time">
+                  <strong>${escapeHTML(slot.period_label)}</strong>
+                  <span>${escapeHTML(slot.time_label)}</span>
+                </div>
+                <div class="sched-item__info">
+                  <span class="sched-item__code">${escapeHTML(slot.subject_code)}</span>
+                  <span class="sched-item__name">${escapeHTML(slot.subject_name)}</span>
+                </div>
+                <span class="sched-item__action">${available ? "Mark →" : "View"}</span>
+              </button>`;
+          })
+          .join("")}
+      </div>`;
+  }
+
 
   function sessionRow(session) {
     const holiday = Boolean(session.is_holiday);
@@ -817,6 +882,8 @@ const state = {
           </button>`;
       })
       .join("");
+
+    renderTodayScheduleMini();
   }
 
   function setRosterPrompt(message) {
@@ -1042,6 +1109,21 @@ const state = {
       </div>`;
   }
 
+  function rosterMiddleMarkup(student) {
+    const total = student.total || 0;
+    const pct = student.percentage !== undefined ? student.percentage : 0;
+    const isShortage = total > 0 && pct < 75.0;
+    const badgeClass = isShortage ? "roster-pill--shortage" : "roster-pill--good";
+    const label = total ? `${pct}% · ${isShortage ? "Shortage" : "Regular"}` : "No data";
+    return `
+      <div class="roster-middle">
+        <span class="roster-pill ${badgeClass}">
+          <span class="pill-dot" aria-hidden="true"></span>
+          ${escapeHTML(label)}
+        </span>
+      </div>`;
+  }
+
   function renderRoster() {
     const roster = state.roster;
     if (!roster) return;
@@ -1122,6 +1204,7 @@ const state = {
                 <strong class="roster-regno">${escapeHTML(student.register_no)}</strong>
                 <span class="roster-name">${escapeHTML(student.name)}</span>
               </div>
+              ${rosterMiddleMarkup(student)}
               ${statusButtons(student.id, status)}
             </div>`;
         })
@@ -1693,6 +1776,18 @@ const state = {
   $("rosterSearch")?.addEventListener("input", (event) => {
     state.search = event.target.value;
     filterRoster();
+  });
+
+  $("todayScheduleMini")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-today-slot]");
+    if (!button) return;
+    openMark({
+      classId: (state.classes[0] && state.classes[0].id) || null,
+      subjectId: Number(button.dataset.subjectId),
+      date: state.today,
+      period: Number(button.dataset.period),
+      substitute: Boolean(Number(button.dataset.canSubstitute)),
+    });
   });
 
   $("rosterList")?.addEventListener("click", (event) => {

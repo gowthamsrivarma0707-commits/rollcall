@@ -2381,12 +2381,36 @@ class RollCallHandler(BaseHTTPRequestHandler):
                 ).fetchall()
                 statuses = {int(row["student_id"]): row["status"] for row in rows}
 
+            stats_rows = conn.execute(
+                """
+                SELECT ar.student_id,
+                       COALESCE(SUM(CASE WHEN ar.status = 'present' THEN ses.span ELSE 0 END), 0) AS attended,
+                       COALESCE(SUM(ses.span), 0) AS total
+                FROM attendance_records ar
+                JOIN attendance_sessions ses ON ses.id = ar.session_id
+                WHERE ses.class_id = ? AND ses.is_holiday = 0
+                GROUP BY ar.student_id
+                """,
+                (class_id,),
+            ).fetchall()
+            stats_map = {
+                int(r["student_id"]): {
+                    "attended": int(r["attended"]),
+                    "total": int(r["total"]),
+                    "percentage": round((int(r["attended"]) / int(r["total"])) * 100, 1) if int(r["total"]) > 0 else 0.0,
+                }
+                for r in stats_rows
+            }
+
         roster = [
             {
                 "id": row["id"],
                 "register_no": row["register_no"],
                 "name": row["name"],
                 "status": statuses.get(int(row["id"])),
+                "attended": stats_map.get(int(row["id"]), {}).get("attended", 0),
+                "total": stats_map.get(int(row["id"]), {}).get("total", 0),
+                "percentage": stats_map.get(int(row["id"]), {}).get("percentage", 0.0),
             }
             for row in students
         ]
