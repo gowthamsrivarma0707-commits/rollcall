@@ -2014,7 +2014,6 @@ const state = {
     }
     grid.innerHTML = electives
       .map((el) => {
-        const pct = Math.min(100, Math.round((el.enrolled_count / (el.capacity || 35)) * 100));
         return `
         <article class="elective-card">
           <div>
@@ -2032,10 +2031,7 @@ const state = {
           <div class="elective-card__stats">
             <div class="elective-card__count-row">
               <span>Enrolled Students</span>
-              <strong>${el.enrolled_count} / ${el.capacity}</strong>
-            </div>
-            <div class="elective-bar-track">
-              <div class="elective-bar-fill" style="width: ${pct}%"></div>
+              <strong style="color:var(--green-dark);">${el.enrolled_count} ${plural(el.enrolled_count, "student")}</strong>
             </div>
           </div>
 
@@ -2090,7 +2086,7 @@ const state = {
 
       $("modalElectiveCode").textContent = data.elective.code;
       $("modalElectiveTitle").textContent = data.elective.name;
-      $("modalElectiveTeacher").textContent = `Faculty In-Charge: ${data.elective.teacher_name} · Capacity: ${data.elective.capacity}`;
+      $("modalElectiveTeacher").textContent = `Faculty In-Charge: ${data.elective.teacher_name}`;
       $("modalEnrolledCount").textContent = data.enrolled_students.length;
 
       renderEnrolledRoster();
@@ -2274,7 +2270,7 @@ const state = {
           code: $("newElectiveCode").value.trim(),
           name: $("newElectiveName").value.trim(),
           teacher_id: $("newElectiveTeacher").value ? parseInt($("newElectiveTeacher").value, 10) : null,
-          capacity: parseInt($("newElectiveCapacity").value, 10) || 35,
+          capacity: 999,
           semester: 2,
         };
         const res = await api.post("/api/electives/add", payload);

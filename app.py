@@ -3260,10 +3260,6 @@ class RollCallHandler(BaseHTTPRequestHandler):
             if not student:
                 raise ApiError(404, "Student not found.")
 
-            curr_count = conn.execute("SELECT COUNT(*) FROM elective_enrollments WHERE elective_id = ?", (elective_id,)).fetchone()[0]
-            if curr_count >= int(elective["capacity"]):
-                raise ApiError(400, f"Cannot enroll: {elective['name']} has reached its capacity limit of {elective['capacity']} students.")
-
             existing_enrollment = conn.execute(
                 """
                 SELECT ee.id, ee.elective_id, e.code, e.name
