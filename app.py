@@ -2944,24 +2944,25 @@ class RollCallHandler(BaseHTTPRequestHandler):
                 target_code = "MCA-GEN"
                 if "ai" in course_raw or "artificial" in course_raw:
                     target_code = "MCA-AI"
-                elif "bca" in course_raw:
-                    target_code = "BCA"
-                elif "math" in course_raw or "bsc" in course_raw or "b.sc" in course_raw:
-                    target_code = "BSC-MATHS"
-                elif "msc" in course_raw or "m.sc" in course_raw:
-                    target_code = "MSC-CS"
                 elif "mca" in course_raw or "gen" in course_raw:
                     target_code = "MCA-GEN"
+                elif course_raw:
+                    clean_code = re.sub(r"[^A-Za-z0-9\-]", "", course_raw.upper())[:15]
+                    target_code = clean_code if clean_code else "MCA-GEN"
                 elif reg_no.startswith("26PSMCI"):
                     target_code = "MCA-AI"
                 elif reg_no.startswith("26PSMCA"):
                     target_code = "MCA-GEN"
-                elif reg_no.startswith("26PSBCA"):
-                    target_code = "BCA"
-                elif reg_no.startswith("26PSBSC"):
-                    target_code = "BSC-MATHS"
 
-                target_class_id = classes_map.get(target_code, classes_map.get("MCA-GEN", 1))
+                if target_code not in classes_map:
+                    display_name = course_raw.strip().title() if course_raw else f"Class {target_code}"
+                    cur_c = conn.execute(
+                        "INSERT INTO classes (code, name, semester) VALUES (?, ?, ?)",
+                        (target_code, display_name, "Admitted Batch"),
+                    )
+                    classes_map[target_code] = cur_c.lastrowid
+
+                target_class_id = classes_map[target_code]
 
                 existing = conn.execute("SELECT id FROM students WHERE register_no = ? COLLATE NOCASE", (reg_no,)).fetchone()
                 if existing:
