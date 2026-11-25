@@ -724,16 +724,12 @@
 .table-class {
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
-  padding: 1px 8px;
-  border-radius: 6px;
-  border: 1px solid rgba(29, 106, 76, 0.2);
-  background: rgba(29, 106, 76, 0.08);
-  color: var(--green-dark);
-  font-family: var(--font-display), monospace;
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.03em;
+  min-height: 21px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: var(--bg-soft);
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .table-subject {
@@ -1143,37 +1139,23 @@
   min-width: 0;
 }
 
-.roster-student strong,
-.roster-student .roster-regno {
-  display: inline-flex;
-  align-items: center;
-  color: var(--green-dark);
-  background: rgba(29, 106, 76, 0.09);
-  padding: 2px 8px;
-  border-radius: 6px;
-  border: 1px solid rgba(29, 106, 76, 0.22);
-  font-family: var(--font-display), monospace;
-  font-size: 13.5px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  line-height: 1.25;
-}
-
-.roster-student span,
-.roster-student .roster-name {
+.roster-student strong {
   display: block;
-  margin-top: 3px;
+  overflow: hidden;
   color: var(--ink-soft);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.roster-row.is-absent .roster-student .roster-regno {
-  color: var(--danger);
-  background: var(--coral-soft);
-  border-color: rgba(184, 74, 56, 0.4);
-  box-shadow: 0 0 0 2px rgba(184, 74, 56, 0.2);
+.roster-student span {
+  display: block;
+  margin-top: 1px;
+  color: var(--muted-light);
+  font-size: 12px;
+  letter-spacing: 0.02em;
 }
 
 .status-toggle {
@@ -2266,17 +2248,8 @@
   color: var(--muted-light);
 }
 
-.data-table tbody tr.is-low td .table-class {
-  border-color: #d4a017;
-  background: #fff3cd;
-  color: #856404;
-  font-weight: 800;
-  box-shadow: 0 0 0 2px rgba(212, 160, 23, 0.25);
-}
-
-.data-table tbody tr.is-low td .table-subject {
-  color: var(--ink);
-  font-weight: 600;
+.data-table tbody tr.is-low td strong {
+  color: var(--danger);
 }
 
 .students-export {

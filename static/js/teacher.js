@@ -1119,8 +1119,8 @@ const state = {
               <span class="roster-index">${String(index + 1).padStart(2, "0")}</span>
               <span class="avatar" aria-hidden="true">${escapeHTML(initials(student.name))}</span>
               <div class="roster-student">
-                <strong class="roster-regno">${escapeHTML(student.register_no)}</strong>
-                <span class="roster-name">${escapeHTML(student.name)}</span>
+                <strong>${escapeHTML(student.name)}</strong>
+                <span>${escapeHTML(student.register_no)}</span>
               </div>
               ${statusButtons(student.id, status)}
             </div>`;
