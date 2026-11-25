@@ -39,7 +39,7 @@
 
       <div class="app-header__actions">
         <span class="live-pill live-pill--header"><span></span> Admin</span>
-        <div class="profile-chip">
+        <div class="profile-chip" id="headerProfileChip" role="button" tabindex="0" title="Click to view & edit your profile">
           <span class="avatar avatar--teacher" id="teacherAvatar" aria-hidden="true">—</span>
           <span class="profile-chip__text">
             <strong id="teacherName">Loading…</strong>
@@ -700,6 +700,91 @@
           <div class="modal-foot">
             <button class="btn btn--ghost" type="button" data-close-modal>Cancel</button>
             <button class="btn btn--dark" id="btnSubmitAddElective" type="submit">Create Elective</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL: USER PROFILE (ADMIN & TEACHER) -->
+    <div class="modal-backdrop" id="modalUserProfile" hidden>
+      <div class="modal-card modal--profile" role="dialog" aria-modal="true" aria-labelledby="modalProfileTitle">
+        <div class="modal-head">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span class="section-tag" id="profileRoleBadge">Profile</span>
+            <h3 id="modalProfileTitle" style="margin:0;">Profile Details</h3>
+          </div>
+          <button class="modal-close" type="button" data-close-modal aria-label="Close modal">✕</button>
+        </div>
+
+        <form id="formUserProfile" class="modal-body">
+          <!-- Profile Pic & Avatar Section -->
+          <div class="profile-pic-section">
+            <div class="profile-avatar-wrap">
+              <div class="profile-avatar-large" id="profileAvatarLarge">
+                <span id="profileAvatarInitials">A</span>
+              </div>
+            </div>
+            <div class="profile-pic-actions">
+              <div style="font-weight:700; font-size:16px; color:var(--text-main);" id="profileDisplayCardName">Administrator</div>
+              <p style="font-size:12px; color:var(--text-muted); margin:4px 0 12px;">Upload a profile picture or take a live photo from your device camera.</p>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <label class="btn btn--small btn--dark" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  Upload Photo
+                  <input type="file" id="inputProfilePhoto" accept="image/*" hidden>
+                </label>
+                <label class="btn btn--small btn--ghost" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  Take Photo (Camera)
+                  <input type="file" id="inputProfileCamera" accept="image/*" capture="user" hidden>
+                </label>
+                <button type="button" class="btn btn--small btn--ghost" id="btnRemoveProfilePhoto" style="color:#d9534f; border-color:rgba(217,83,79,0.3);">
+                  Remove Photo
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="profile-grid">
+            <div class="form-field">
+              <label for="profileFullName">Full Name *</label>
+              <input id="profileFullName" type="text" placeholder="e.g. Dr. P. Ratna Pavani" required>
+            </div>
+
+            <div class="form-field">
+              <label for="profileEmpId">Employee ID / Username</label>
+              <input id="profileEmpId" type="text" readonly disabled style="background:var(--bg-muted, #f3f3f3); cursor:not-allowed;">
+            </div>
+
+            <div class="form-field">
+              <label for="profileEmail">College / Official Email *</label>
+              <input id="profileEmail" type="email" placeholder="faculty@gvpihlr.edu.in" required>
+            </div>
+
+            <div class="form-field">
+              <label for="profileDob">Date of Birth (DOB)</label>
+              <input id="profileDob" type="date">
+            </div>
+
+            <div class="form-field profile-grid-span2">
+              <label for="profileQualification">Qualifications & Studies *</label>
+              <input id="profileQualification" type="text" placeholder="e.g. B.Tech, M.Tech (CSE), Ph.D in Computer Science" required>
+            </div>
+
+            <div class="form-field profile-grid-span2">
+              <label for="profileDepartment">Department / Branch</label>
+              <input id="profileDepartment" type="text" placeholder="e.g. School of Science / MCA">
+            </div>
+
+            <div class="form-field profile-grid-span2">
+              <label for="profileBio">Specialization / About</label>
+              <textarea id="profileBio" rows="2" placeholder="e.g. Specialization in Data Science, Machine Learning, Cloud Systems, etc."></textarea>
+            </div>
+          </div>
+
+          <div class="modal-foot" style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border-subtle, #e5e5e5); display:flex; justify-content:flex-end; gap:10px;">
+            <button class="btn btn--ghost" type="button" data-close-modal>Cancel</button>
+            <button class="btn btn--lime" id="btnSaveProfile" type="submit" style="font-weight:700;">Save Profile Changes</button>
           </div>
         </form>
       </div>

@@ -373,6 +373,7 @@ const state = {
         initializeStudentsControls();
         initializeStudentsExport();
         initializeAddElective();
+        initializeProfileModal();
         state.initialized = true;
       } else if (state.view === "mark") {
         renderMarkSlots();
@@ -423,7 +424,14 @@ const state = {
 
     setText("teacherName", teacher.name);
     setText("teacherDepartment", teacher.email || teacher.department);
-    setText("teacherAvatar", initials(teacher.name));
+    const headerAvatar = $("teacherAvatar");
+    if (headerAvatar) {
+      if (teacher.photo_base64) {
+        headerAvatar.innerHTML = `<img src="${teacher.photo_base64}" alt="${escapeHTML(teacher.name)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;">`;
+      } else {
+        headerAvatar.textContent = initials(teacher.name);
+      }
+    }
     setText("teacherFirstName", teacherFirstName(teacher.name));
     setText(
       "teacherClassLine",
@@ -2278,6 +2286,162 @@ const state = {
         toast(err.message, "error");
       } finally {
         setButtonLoading(submitBtn, false);
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------
+     User Profile Modal & Avatar Management
+     --------------------------------------------------------- */
+  let currentProfilePhotoBase64 = "";
+
+  function openProfileModal() {
+    const modal = $("modalUserProfile");
+    if (!modal) return;
+    const teacher = state.data?.teacher || {};
+    const isAdmin = Boolean(state.data?.admin_view);
+
+    if ($("profileRoleBadge")) {
+      $("profileRoleBadge").textContent = isAdmin ? "Administrator" : "Faculty Profile";
+    }
+    if ($("modalProfileTitle")) {
+      $("modalProfileTitle").textContent = isAdmin ? "Administrator Profile" : "Faculty Profile";
+    }
+    if ($("profileDisplayCardName")) {
+      $("profileDisplayCardName").textContent = teacher.name || (isAdmin ? "Administrator" : "Faculty");
+    }
+
+    if ($("profileFullName")) $("profileFullName").value = teacher.name || "";
+    if ($("profileEmpId")) $("profileEmpId").value = teacher.employee_id || teacher.username || "";
+    if ($("profileEmail")) $("profileEmail").value = teacher.email || "";
+    if ($("profileDob")) $("profileDob").value = teacher.dob || "";
+    if ($("profileQualification")) $("profileQualification").value = teacher.qualification || "";
+    if ($("profileDepartment")) $("profileDepartment").value = teacher.department || (isAdmin ? "Administration" : "");
+    if ($("profileBio")) $("profileBio").value = teacher.bio || "";
+
+    currentProfilePhotoBase64 = teacher.photo_base64 || "";
+    renderProfileModalPhoto(currentProfilePhotoBase64, teacher.name);
+
+    modal.hidden = false;
+  }
+
+  function renderProfileModalPhoto(photoBase64, name = "") {
+    const preview = $("profileAvatarLarge");
+    if (!preview) return;
+    if (photoBase64) {
+      preview.innerHTML = `<img src="${photoBase64}" alt="${escapeHTML(name || "Profile")}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;">`;
+    } else {
+      preview.innerHTML = `<span id="profileAvatarInitials" style="font-size:32px; font-weight:700;">${initials(name || "Profile")}</span>`;
+    }
+  }
+
+  function compressAndSetPhoto(file) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast("Please upload a valid image file (PNG, JPG, WebP).", "error");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 600;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        currentProfilePhotoBase64 = canvas.toDataURL("image/jpeg", 0.85);
+        renderProfileModalPhoto(currentProfilePhotoBase64, $("profileFullName")?.value || "");
+        toast("Photo loaded! Click 'Save Profile Changes' to save.", "info");
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function initializeProfileModal() {
+    const chip = $("headerProfileChip");
+    if (chip) {
+      chip.addEventListener("click", (e) => {
+        if (e.target.closest("a, button, [data-logout]")) return;
+        openProfileModal();
+      });
+    }
+
+    $("inputProfilePhoto")?.addEventListener("change", (e) => {
+      if (e.target.files && e.target.files[0]) {
+        compressAndSetPhoto(e.target.files[0]);
+      }
+    });
+
+    $("inputProfileCamera")?.addEventListener("change", (e) => {
+      if (e.target.files && e.target.files[0]) {
+        compressAndSetPhoto(e.target.files[0]);
+      }
+    });
+
+    $("btnRemoveProfilePhoto")?.addEventListener("click", () => {
+      currentProfilePhotoBase64 = "";
+      renderProfileModalPhoto("", $("profileFullName")?.value || "");
+      toast("Photo removed. Save to apply changes.", "info");
+    });
+
+    $("formUserProfile")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const saveBtn = $("btnSaveProfile");
+      const restore = setButtonLoading ? setButtonLoading(saveBtn, "Saving…") : () => {};
+
+      const payload = {
+        name: $("profileFullName").value.trim(),
+        email: $("profileEmail").value.trim(),
+        dob: $("profileDob").value.trim(),
+        qualification: $("profileQualification").value.trim(),
+        department: $("profileDepartment").value.trim(),
+        bio: $("profileBio").value.trim(),
+        photo_base64: currentProfilePhotoBase64,
+      };
+
+      try {
+        const response = await fetch("/api/profile/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        if (!data.ok) throw new Error(data.message || "Failed to update profile.");
+
+        toast("Profile updated successfully!", "success");
+        $("modalUserProfile").hidden = true;
+
+        if (state.data && state.data.teacher) {
+          Object.assign(state.data.teacher, data.user || payload);
+          setText("teacherName", state.data.teacher.name);
+          setText("teacherDepartment", state.data.teacher.email || state.data.teacher.department);
+          const avatarEl = $("teacherAvatar");
+          if (avatarEl) {
+            if (state.data.teacher.photo_base64) {
+              avatarEl.innerHTML = `<img src="${state.data.teacher.photo_base64}" alt="${escapeHTML(state.data.teacher.name)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;">`;
+            } else {
+              avatarEl.textContent = initials(state.data.teacher.name);
+            }
+          }
+        }
+      } catch (err) {
+        toast(err.message || "Error saving profile.", "error");
+      } finally {
+        if (typeof restore === "function") restore();
       }
     });
   }

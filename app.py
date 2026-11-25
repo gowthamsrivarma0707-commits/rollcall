@@ -73,7 +73,7 @@ SESSION_COOKIE = "rollcall_session"
 SESSION_ROLES = ("student", "teacher", "admin")
 PRINCIPAL_USERNAME = "principal"
 SESSION_TTL_SECONDS = 14 * 24 * 60 * 60
-MAX_BODY_BYTES = 1_000_000
+MAX_BODY_BYTES = 5_000_000
 STATIC_SUFFIXES = {
     ".css",
     ".js",
@@ -121,7 +121,11 @@ CREATE TABLE IF NOT EXISTS teachers (
     email               TEXT NOT NULL UNIQUE,
     password_hash       TEXT NOT NULL,
     department          TEXT NOT NULL,
-    must_change_password INTEGER NOT NULL DEFAULT 1
+    must_change_password INTEGER NOT NULL DEFAULT 1,
+    dob                 TEXT,
+    qualification       TEXT,
+    photo_base64        TEXT,
+    bio                 TEXT
 );
 
 CREATE TABLE IF NOT EXISTS admins (
@@ -130,7 +134,12 @@ CREATE TABLE IF NOT EXISTS admins (
     name                TEXT NOT NULL,
     password_hash       TEXT NOT NULL,
     created_at          TEXT NOT NULL,
-    must_change_password INTEGER NOT NULL DEFAULT 1
+    must_change_password INTEGER NOT NULL DEFAULT 1,
+    email               TEXT,
+    dob                 TEXT,
+    qualification       TEXT,
+    photo_base64        TEXT,
+    bio                 TEXT
 );
 
 CREATE TABLE IF NOT EXISTS students (
@@ -310,6 +319,21 @@ def init_db(reset: bool = False) -> None:
                     f"ALTER TABLE {table} "
                     "ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 1"
                 )
+
+        for table in ("teachers", "admins"):
+            table_columns = {
+                row["name"]
+                for row in conn.execute(f"PRAGMA table_info({table})")
+            }
+            for col, col_type in [
+                ("email", "TEXT"),
+                ("dob", "TEXT"),
+                ("qualification", "TEXT"),
+                ("photo_base64", "TEXT"),
+                ("bio", "TEXT"),
+            ]:
+                if col not in table_columns:
+                    conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")
         if "marked_by_teacher_id" not in session_columns:
             conn.execute(
                 "ALTER TABLE attendance_sessions "
@@ -1020,7 +1044,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
             if role == "admin":
                 row = conn.execute(
                     """
-                    SELECT id, username, name, must_change_password
+                    SELECT id, username, name, must_change_password, email, dob, qualification, photo_base64, bio
                     FROM admins WHERE id = ?
                     """,
                     (user_id,),
@@ -1033,14 +1057,18 @@ class RollCallHandler(BaseHTTPRequestHandler):
                     "username": row["username"],
                     "name": row["name"],
                     "employee_id": row["username"],
-                    "email": row["username"],
+                    "email": row["email"] or "isp@gvpihlr.edu.in",
                     "department": "Administration",
                     "must_change_password": bool(row["must_change_password"]),
+                    "dob": row["dob"] or "",
+                    "qualification": row["qualification"] or "",
+                    "photo_base64": row["photo_base64"] or "",
+                    "bio": row["bio"] or "",
                 }
             row = conn.execute(
                 """
                 SELECT id, name, employee_id, email, department,
-                       must_change_password
+                       must_change_password, dob, qualification, photo_base64, bio
                 FROM teachers WHERE id = ?
                 """,
                 (user_id,),
@@ -1049,6 +1077,10 @@ class RollCallHandler(BaseHTTPRequestHandler):
                 return None
             profile = dict(row)
             profile["must_change_password"] = bool(profile.get("must_change_password"))
+            profile["dob"] = profile.get("dob") or ""
+            profile["qualification"] = profile.get("qualification") or ""
+            profile["photo_base64"] = profile.get("photo_base64") or ""
+            profile["bio"] = profile.get("bio") or ""
             return {"role": "teacher", **profile}
 
     def _create_session_cookie(self, role: str, user_id: int) -> str:
@@ -1376,6 +1408,9 @@ class RollCallHandler(BaseHTTPRequestHandler):
                 elective_id = int(parts[3])
                 self._unenroll_elective_student(elective_id, session, is_admin)
                 return
+        if path == "/api/profile/update":
+            self._update_profile()
+            return
         raise ApiError(404, "API endpoint not found.")
 
     def _login(self) -> None:
@@ -1968,7 +2003,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
         with get_db() as conn:
             if admin:
                 row = conn.execute(
-                    "SELECT id, username, name FROM admins WHERE id = ?",
+                    "SELECT id, username, name, email, dob, qualification, photo_base64, bio FROM admins WHERE id = ?",
                     (teacher_id,),
                 ).fetchone()
                 if not row:
@@ -1977,8 +2012,12 @@ class RollCallHandler(BaseHTTPRequestHandler):
                     "id": row["id"],
                     "name": row["name"],
                     "employee_id": row["username"],
-                    "email": row["username"],
+                    "email": row["email"] or "isp@gvpihlr.edu.in",
                     "department": "Administration",
+                    "dob": row["dob"] or "",
+                    "qualification": row["qualification"] or "",
+                    "photo_base64": row["photo_base64"] or "",
+                    "bio": row["bio"] or "",
                 }
                 rows = conn.execute(
                     """
@@ -1994,15 +2033,27 @@ class RollCallHandler(BaseHTTPRequestHandler):
                     """
                 ).fetchall()
             else:
-                teacher = conn.execute(
+                teacher_row = conn.execute(
                     """
-                    SELECT id, name, employee_id, email, department
+                    SELECT id, name, employee_id, email, department,
+                           dob, qualification, photo_base64, bio
                     FROM teachers WHERE id = ?
                     """,
                     (teacher_id,),
                 ).fetchone()
-                if not teacher:
+                if not teacher_row:
                     raise ApiError(401, "Teacher account not found.")
+                teacher = {
+                    "id": teacher_row["id"],
+                    "name": teacher_row["name"],
+                    "employee_id": teacher_row["employee_id"],
+                    "email": teacher_row["email"],
+                    "department": teacher_row["department"],
+                    "dob": teacher_row["dob"] or "",
+                    "qualification": teacher_row["qualification"] or "",
+                    "photo_base64": teacher_row["photo_base64"] or "",
+                    "bio": teacher_row["bio"] or "",
+                }
                 rows = conn.execute(
                     """
                     SELECT ta.class_id, ta.subject_id,
@@ -3272,6 +3323,61 @@ class RollCallHandler(BaseHTTPRequestHandler):
                 "ok": True,
                 "message": f"Removed {student['name']} ({student['register_no']}) from {elective['name']}.",
             })
+
+    def _update_profile(self) -> None:
+        session, is_admin = self._require_staff_session()
+        payload = self._read_json()
+        name = str(payload.get("name", "")).strip()
+        email = str(payload.get("email", "")).strip()
+        dob = str(payload.get("dob", "")).strip()
+        qualification = str(payload.get("qualification", "")).strip()
+        bio = str(payload.get("bio", "")).strip()
+        photo_base64 = str(payload.get("photo_base64", "")).strip()
+        department = str(payload.get("department", "")).strip()
+
+        if not name:
+            raise ApiError(400, "Name cannot be empty.")
+        if len(name) > 100:
+            raise ApiError(400, "Name is too long.")
+        if email and len(email) > 120:
+            raise ApiError(400, "Email is too long.")
+        if len(qualification) > 250:
+            raise ApiError(400, "Qualifications text is too long.")
+        if len(bio) > 500:
+            raise ApiError(400, "Bio is too long.")
+        if len(photo_base64) > 4_000_000:
+            raise ApiError(400, "Photo is too large. Please choose an image under 3MB.")
+
+        with get_db() as conn:
+            if is_admin:
+                conn.execute(
+                    """
+                    UPDATE admins
+                    SET name = ?, email = ?, dob = ?, qualification = ?, bio = ?, photo_base64 = ?
+                    WHERE id = ?
+                    """,
+                    (name, email, dob, qualification, bio, photo_base64, session["user_id"]),
+                )
+                audit(conn, session["role"], session["user_id"], "update_profile", f"Admin profile updated: {name}")
+            else:
+                conn.execute(
+                    """
+                    UPDATE teachers
+                    SET name = ?, email = ?, department = COALESCE(NULLIF(?, ''), department),
+                        dob = ?, qualification = ?, bio = ?, photo_base64 = ?
+                    WHERE id = ?
+                    """,
+                    (name, email, department, dob, qualification, bio, photo_base64, session["user_id"]),
+                )
+                audit(conn, session["role"], session["user_id"], "update_profile", f"Teacher profile updated: {name}")
+            conn.commit()
+
+        updated_profile = self._profile(session["role"], session["user_id"])
+        self._send_json({
+            "ok": True,
+            "message": "Profile updated successfully.",
+            "user": updated_profile,
+        })
 
     def _teacher_sessions(self, teacher_id: int, query: dict, *, admin: bool = False) -> dict:
         filters = []
