@@ -1993,7 +1993,7 @@ const state = {
       state.electives = data.electives || [];
       renderElectiveCards(state.electives);
     } catch (err) {
-      grid.innerHTML = `<div class="empty-state"><p>${escapeHtml(err.message)}</p></div>`;
+      grid.innerHTML = `<div class="empty-state"><p>${escapeHTML(err.message)}</p></div>`;
     }
   }
 
@@ -2011,13 +2011,13 @@ const state = {
         <article class="elective-card">
           <div>
             <div class="elective-card__head">
-              <span class="section-tag">${escapeHtml(el.code)}</span>
+              <span class="section-tag">${escapeHTML(el.code)}</span>
               <span class="live-pill">Sem ${el.semester}</span>
             </div>
-            <h3 class="elective-card__title">${escapeHtml(el.name)}</h3>
+            <h3 class="elective-card__title">${escapeHTML(el.name)}</h3>
             <div class="elective-card__faculty">
               <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
-              <span>Faculty: <strong>${escapeHtml(el.teacher_name)}</strong></span>
+              <span>Faculty: <strong>${escapeHTML(el.teacher_name)}</strong></span>
             </div>
           </div>
 
@@ -2113,17 +2113,17 @@ const state = {
         (s) => `
       <div class="roster-student-item">
         <div class="roster-student-info">
-          <span class="roster-student-avatar">${escapeHtml(s.name.slice(0, 2).toUpperCase())}</span>
+          <span class="roster-student-avatar">${escapeHTML(s.name.slice(0, 2).toUpperCase())}</span>
           <div class="roster-student-details">
-            <strong>${escapeHtml(s.name)}</strong>
+            <strong>${escapeHTML(s.name)}</strong>
             <small>
-              <span>${escapeHtml(s.register_no)}</span>
-              <span class="section-tag">${escapeHtml(s.class_code || "MCA")}</span>
+              <span>${escapeHTML(s.register_no)}</span>
+              <span class="section-tag">${escapeHTML(s.class_code || "MCA")}</span>
               <span class="enrolled-here-pill">✓ Enrolled</span>
             </small>
           </div>
         </div>
-        <button class="btn-remove-student" type="button" data-unenroll-student="${s.id}" data-student-name="${escapeHtml(s.name)}">
+        <button class="btn-remove-student" type="button" data-unenroll-student="${s.id}" data-student-name="${escapeHTML(s.name)}">
           Remove ✕
         </button>
       </div>
@@ -2165,9 +2165,9 @@ const state = {
         let badgeHtml = "";
         if (s.is_enrolled_here) {
           badgeHtml = '<span class="enrolled-here-pill">✓ Enrolled Here</span>';
-          actionHtml = `<button class="btn-remove-student" type="button" data-unenroll-student="${s.id}" data-student-name="${escapeHtml(s.name)}">Remove</button>`;
+          actionHtml = `<button class="btn-remove-student" type="button" data-unenroll-student="${s.id}" data-student-name="${escapeHTML(s.name)}">Remove</button>`;
         } else if (!s.can_enroll) {
-          badgeHtml = `<span class="conflict-pill" title="Student is already taking another elective">Enrolled in ${escapeHtml(s.conflict_elective || "another elective")}</span>`;
+          badgeHtml = `<span class="conflict-pill" title="Student is already taking another elective">Enrolled in ${escapeHTML(s.conflict_elective || "another elective")}</span>`;
           actionHtml = `<button class="btn-enroll-student" type="button" disabled title="1 student can only take 1 elective">Locked</button>`;
         } else {
           actionHtml = `<button class="btn-enroll-student" type="button" data-enroll-student="${s.id}">+ Enroll</button>`;
@@ -2176,12 +2176,12 @@ const state = {
         return `
         <div class="roster-student-item">
           <div class="roster-student-info">
-            <span class="roster-student-avatar">${escapeHtml(s.name.slice(0, 2).toUpperCase())}</span>
+            <span class="roster-student-avatar">${escapeHTML(s.name.slice(0, 2).toUpperCase())}</span>
             <div class="roster-student-details">
-              <strong>${escapeHtml(s.name)}</strong>
+              <strong>${escapeHTML(s.name)}</strong>
               <small>
-                <span>${escapeHtml(s.register_no)}</span>
-                <span class="section-tag">${escapeHtml(s.class_code)}</span>
+                <span>${escapeHTML(s.register_no)}</span>
+                <span class="section-tag">${escapeHTML(s.class_code)}</span>
                 ${badgeHtml}
               </small>
             </div>
@@ -2252,7 +2252,7 @@ const state = {
       const teacherSelect = $("newElectiveTeacher");
       if (teacherSelect && state.teachers) {
         teacherSelect.innerHTML = state.teachers
-          .map((t) => `<option value="${t.id}">${escapeHtml(t.name)} (${escapeHtml(t.employee_id)})</option>`)
+          .map((t) => `<option value="${t.id}">${escapeHTML(t.name)} (${escapeHTML(t.employee_id)})</option>`)
           .join("");
       }
     });
@@ -2537,3 +2537,4 @@ const state = {
     syncOfflineQueue();
   }
 })();
+

@@ -327,12 +327,11 @@ def init_db(reset: bool = False) -> None:
         # Ensure default Sem-2 Electives are present
         elective_cnt = conn.execute("SELECT COUNT(*) FROM electives").fetchone()[0]
         if elective_cnt == 0:
-            teachers_map = {row["employee_id"]: row["id"] for row in conn.execute("SELECT id, employee_id FROM teachers").fetchall()}
             sample_electives = [
-                ("MCA-E1-CC", "Cloud Computing & Virtualization", 2, teachers_map.get("RK"), 35),
-                ("MCA-E1-CSF", "Cyber Security & Digital Forensics", 2, teachers_map.get("CHSSRP"), 35),
-                ("MCA-E1-DL", "Deep Learning & Neural Networks", 2, teachers_map.get("PRP"), 35),
-                ("MCA-E1-BDA", "Big Data Analytics & Frameworks", 2, teachers_map.get("VL"), 35),
+                ("MCA-SEM2-DS",   "Data Science",          2, None, 35),
+                ("MCA-SEM2-CC",   "Cloud Computing",        2, None, 35),
+                ("MCA-SEM2-QC",   "Quantum Computing",      2, None, 35),
+                ("MCA-SEM2-AIML", "AI & Machine Learning",  2, None, 35),
             ]
             for e_code, e_name, e_sem, e_tid, e_cap in sample_electives:
                 conn.execute(
