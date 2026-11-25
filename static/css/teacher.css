@@ -1488,6 +1488,42 @@
   min-width: 185px;
 }
 
+.roster-savebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+
+.roster-savebar-actions .btn {
+  flex: 0 0 auto;
+  min-width: 170px;
+}
+
+#unlockAttendanceButton {
+  border-color: rgba(13, 47, 36, 0.22);
+  color: var(--green-dark);
+}
+
+#unlockAttendanceButton:hover {
+  background: var(--surface-2);
+  border-color: var(--green-dark);
+}
+
+.status-toggle.is-locked {
+  opacity: 0.85;
+}
+
+.status-toggle.is-locked .status-btn {
+  pointer-events: none;
+  cursor: default;
+}
+
+.roster-card.is-locked-session .bulk-button {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
 .roster-card[data-state="loading"] .status-toggle,
 .roster-card[data-state="loading"] .bulk-button,
 .roster-card[data-state="loading"] .search-field input {
@@ -2243,6 +2279,13 @@
     flex-direction: row;
     gap: 12px;
     padding: 10px 20px;
+  }
+
+  .roster-savebar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
   }
 
   .roster-savebar > div {

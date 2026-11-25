@@ -2,104 +2,99 @@
   "use strict";
 
   const { api, setButtonLoading } = window.RollCall;
-  const isAdmin = window.location.pathname.startsWith("/admin");
-  const isTeacher = window.location.pathname.startsWith("/teacher");
-  const role = isAdmin ? "admin" : isTeacher ? "teacher" : "student";
 
-  const copy = isAdmin
-    ? {
-        documentTitle: "Admin login · RollCall",
-        asideKicker: "GVP IHLR · ADMIN ACCESS",
-        asideHeading: "“Oversight,<br>without the noise.”",
-        asideCopy:
-          "View every MCA-1 session, correct any roll call, and review attendance across all subjects and teachers from one place.",
-        badge: "Admin console",
-        heading: "Welcome back, Principal.",
-        subtitle:
-          "Sign in with your admin username to review and update attendance across all teachers.",
-        usernameLabel: "Admin username",
-        usernamePlaceholder: "Admin username",
-        usernameAutocomplete: "username",
-        loginButton: "Open admin console",
-        switchPrompt: "Are you a teacher?",
-        switchHref: "/teacher/login",
-        switchText: "Go to teacher login",
-      }
-    : isTeacher
-      ? {
-        documentTitle: "Teacher login · RollCall",
-        asideKicker: "GVP IHLR · TEACHER ACCESS",
-        asideHeading: "“Roll call,<br>minus the paperwork.”",
-        asideCopy:
-          "Open your period from the MCA-1 timetable, tap the absentees and save. Labs and the CTV interactive program are marked once and counted for their full span.",
-        badge: "Teacher portal",
-        heading: "Welcome back, Professor.",
-        subtitle:
-          "Sign in with your employee ID or college email to take attendance and review saved records.",
-        usernameLabel: "Employee ID or email",
-        usernamePlaceholder: "Employee ID or college email",
-        usernameAutocomplete: "username",
-        loginButton: "Open teacher dashboard",
-        switchPrompt: "Are you a student?",
-        switchHref: "/student/login",
-        switchText: "Go to student login",
-      }
-    : {
-        documentTitle: "Student login · RollCall",
-        asideKicker: "GVP IHLR · STUDENT ACCESS",
-        asideHeading: "“The number<br>speaks for itself.”",
-        asideCopy:
-          "Every class, every period, always up to date. See your MCA-1 timetable, your live attendance, and every holiday that is excluded from the count.",
-        badge: "Student portal",
-        heading: "Welcome back.",
-        subtitle:
-          "Sign in with your register number to see your live attendance, safe-to-skip allowance and recovery plan.",
-        usernameLabel: "Register number",
-        usernamePlaceholder: "Register number",
-        usernameAutocomplete: "username",
-        loginButton: "Sign in to my dashboard",
-        switchPrompt: "Are you a teacher?",
-        switchHref: "/teacher/login",
-        switchText: "Go to teacher login",
-      };
+  const ROLE_CONFIG = {
+    student: {
+      documentTitle: "Student login · RollCall",
+      asideKicker: "GVP IHLR · STUDENT ACCESS",
+      asideHeading: "“The number<br>speaks for itself.”",
+      asideCopy:
+        "Every class, every period, always up to date. See your MCA-1 timetable, your live attendance, and every holiday that is excluded from the count.",
+      badge: "Student portal",
+      heading: "Welcome back.",
+      subtitle:
+        "Sign in with your register number to see your live attendance, safe-to-skip allowance and recovery plan.",
+      usernameLabel: "Register number",
+      usernamePlaceholder: "e.g. 26PSMCA0001",
+      usernameAutocomplete: "username",
+      autocapitalize: "characters",
+      loginButton: "Sign in to my dashboard",
+      emptyError: "Enter your register number and password.",
+      switchPrompt: "Are you a teacher?",
+      switchRole: "teacher",
+      switchText: "Switch to faculty login",
+      defaultPath: "/student",
+    },
+    teacher: {
+      documentTitle: "Faculty login · RollCall",
+      asideKicker: "GVP IHLR · FACULTY ACCESS",
+      asideHeading: "“Roll call,<br>minus the paperwork.”",
+      asideCopy:
+        "Open your period from the MCA-1 timetable, tap the absentees and save. Labs and the CTV interactive program are marked once and counted for their full span.",
+      badge: "Faculty portal",
+      heading: "Welcome back, Professor.",
+      subtitle:
+        "Sign in with your employee ID or college email to take attendance and review saved records.",
+      usernameLabel: "Employee ID or email",
+      usernamePlaceholder: "e.g. BD or teacher@gvpce.ac.in",
+      usernameAutocomplete: "username",
+      autocapitalize: "none",
+      loginButton: "Open faculty dashboard",
+      emptyError: "Enter your employee ID or college email and password.",
+      switchPrompt: "Are you an administrator?",
+      switchRole: "admin",
+      switchText: "Switch to admin console",
+      defaultPath: "/teacher",
+    },
+    admin: {
+      documentTitle: "Admin login · RollCall",
+      asideKicker: "GVP IHLR · ADMIN ACCESS",
+      asideHeading: "“Oversight,<br>without the noise.”",
+      asideCopy:
+        "View every session, correct any roll call, and manage timetable, faculty, and student allocations from one centralized place.",
+      badge: "Admin console",
+      heading: "Welcome back, Administrator.",
+      subtitle:
+        "Sign in with your admin username (e.g. ISP or principal) to manage the attendance portal.",
+      usernameLabel: "Admin username",
+      usernamePlaceholder: "e.g. ISP or principal",
+      usernameAutocomplete: "username",
+      autocapitalize: "none",
+      loginButton: "Open admin console",
+      emptyError: "Enter your admin username and password.",
+      switchPrompt: "Are you a student?",
+      switchRole: "student",
+      switchText: "Switch to student login",
+      defaultPath: "/admin",
+    },
+  };
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const paramRole = urlParams.get("role");
+  let currentRole = "student";
+
+  if (window.location.pathname.startsWith("/admin") || paramRole === "admin") {
+    currentRole = "admin";
+  } else if (window.location.pathname.startsWith("/teacher") || paramRole === "teacher") {
+    currentRole = "teacher";
+  } else if (paramRole === "student" || window.location.pathname.startsWith("/student")) {
+    currentRole = "student";
+  }
 
   const setText = (id, value) => {
     const node = document.getElementById(id);
     if (node) node.textContent = value;
   };
 
-  document.title = copy.documentTitle;
-  document.body.dataset.role = role;
-  setText("asideKicker", copy.asideKicker);
-  const asideHeading = document.getElementById("asideHeading");
-  if (asideHeading) asideHeading.innerHTML = copy.asideHeading;
-  setText("asideCopy", copy.asideCopy);
-  setText("roleBadgeText", copy.badge);
-  setText("formHeading", copy.heading);
-  setText("formSubtitle", copy.subtitle);
-  setText("usernameLabel", copy.usernameLabel);
-  setText("loginButtonText", copy.loginButton);
-  setText("switchPrompt", copy.switchPrompt);
-  setText("year", String(new Date().getFullYear()));
-
-  const switchLink = document.getElementById("switchLink");
-  if (switchLink) {
-    switchLink.href = copy.switchHref;
-    switchLink.innerHTML = `${copy.switchText} <span>→</span>`;
-  }
-
   const username = document.getElementById("username");
-  if (username) {
-    username.placeholder = copy.usernamePlaceholder;
-    username.autocomplete = copy.usernameAutocomplete;
-    username.autocapitalize = isTeacher ? "none" : "characters";
-  }
-
   const password = document.getElementById("password");
   const form = document.getElementById("loginForm");
   const errorBox = document.getElementById("formError");
   const loginButton = document.getElementById("loginButton");
   const passwordToggle = document.getElementById("passwordToggle");
+  const switchLink = document.getElementById("switchLink");
+  const roleTabs = document.querySelectorAll(".auth-role-tab");
+
   function showError(message) {
     if (!errorBox) return;
     errorBox.textContent = message;
@@ -111,6 +106,74 @@
     errorBox.hidden = true;
     errorBox.textContent = "";
   }
+
+  function setRole(role, updateHistory = true) {
+    if (!ROLE_CONFIG[role]) role = "student";
+    currentRole = role;
+    const copy = ROLE_CONFIG[role];
+
+    document.title = copy.documentTitle;
+    document.body.dataset.role = role;
+    setText("asideKicker", copy.asideKicker);
+    const asideHeading = document.getElementById("asideHeading");
+    if (asideHeading) asideHeading.innerHTML = copy.asideHeading;
+    setText("asideCopy", copy.asideCopy);
+    setText("roleBadgeText", copy.badge);
+    setText("formHeading", copy.heading);
+    setText("formSubtitle", copy.subtitle);
+    setText("usernameLabel", copy.usernameLabel);
+    setText("loginButtonText", copy.loginButton);
+    setText("switchPrompt", copy.switchPrompt);
+    setText("year", String(new Date().getFullYear()));
+
+    if (switchLink) {
+      switchLink.href = `/${copy.switchRole}/login`;
+      switchLink.dataset.targetRole = copy.switchRole;
+      switchLink.innerHTML = `${copy.switchText} <span>→</span>`;
+    }
+
+    if (username) {
+      username.placeholder = copy.usernamePlaceholder;
+      username.autocomplete = copy.usernameAutocomplete;
+      username.autocapitalize = copy.autocapitalize;
+    }
+
+    roleTabs.forEach((tab) => {
+      const active = tab.dataset.role === role;
+      tab.classList.toggle("is-active", active);
+      tab.setAttribute("aria-selected", String(active));
+    });
+
+    clearError();
+
+    if (updateHistory) {
+      try {
+        const newPath = `/${role}/login`;
+        if (window.location.pathname !== newPath) {
+          window.history.replaceState({ role }, "", newPath);
+        }
+      } catch (_) {}
+    }
+  }
+
+  // Bind role tabs click
+  roleTabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const selected = tab.dataset.role;
+      if (selected && selected !== currentRole) {
+        setRole(selected, true);
+        username?.focus();
+      }
+    });
+  });
+
+  // Switch link click (fast switch without full reload)
+  switchLink?.addEventListener("click", (e) => {
+    e.preventDefault();
+    const targetRole = switchLink.dataset.targetRole || "teacher";
+    setRole(targetRole, true);
+    username?.focus();
+  });
 
   username?.addEventListener("input", clearError);
   password?.addEventListener("input", clearError);
@@ -130,12 +193,10 @@
 
     const usernameValue = username.value.trim();
     const passwordValue = password.value;
+    const config = ROLE_CONFIG[currentRole];
+
     if (!usernameValue || !passwordValue) {
-      showError(
-        isTeacher
-          ? "Enter your employee ID or college email and password."
-          : "Enter your register number and password."
-      );
+      showError(config.emptyError);
       (usernameValue ? password : username).focus();
       return;
     }
@@ -158,27 +219,27 @@
       }
       const data = await api.post(
         "/api/login",
-        { role, username: usernameValue, password: passwordValue },
+        { role: currentRole, username: usernameValue, password: passwordValue },
         { redirectOn401: false }
       );
       if (buttonText) buttonText.textContent = "Signing you in…";
 
-      // Cache offline login credentials on this device for zero-network situations
+      // Cache offline login credentials on this device
       try {
         const passHash = await hashPassword(passwordValue);
         localStorage.setItem(
-          `rollcall_offline_auth_${role}`,
+          `rollcall_offline_auth_${currentRole}`,
           JSON.stringify({
             username: usernameValue.toLowerCase(),
             passHash: passHash,
-            redirect: data.redirect || (isTeacher ? "/teacher" : "/student"),
+            redirect: data.redirect || config.defaultPath,
             savedAt: Date.now(),
           })
         );
       } catch (_) {}
 
       localStorage.setItem("rollcall_active_teacher_id", usernameValue.toLowerCase().trim());
-      window.location.assign(data.redirect || (isTeacher ? "/teacher" : "/student"));
+      window.location.assign(data.redirect || config.defaultPath);
     } catch (error) {
       const isOffline =
         !navigator.onLine ||
@@ -187,29 +248,25 @@
         error.message.includes("connection");
 
       if (isOffline) {
-        // Attempt offline device authentication
         try {
           const passHash = await hashPassword(passwordValue);
           const userLower = usernameValue.toLowerCase();
           let matched = false;
 
           // 1. Check if user logged in previously on this device
-          const raw = localStorage.getItem(`rollcall_offline_auth_${role}`);
+          const raw = localStorage.getItem(`rollcall_offline_auth_${currentRole}`);
           if (raw) {
             const cached = JSON.parse(raw);
-            if (
-              cached.username === userLower &&
-              cached.passHash === passHash
-            ) {
+            if (cached.username === userLower && cached.passHash === passHash) {
               matched = true;
             }
           }
 
-          // 2. Built-in offline support for college faculty & students
-          const DEMO_TEACHERS = new Set(["principal", "vl", "prp", "chssrp", "bd", "psr", "rk", "pvrc", "ymg"]);
+          // 2. Built-in offline support for faculty & staff
+          const DEMO_TEACHERS = new Set(["principal", "isp", "vl", "prp", "chssrp", "bd", "psr", "rk", "pvrc", "ymg"]);
           const TEACHER_DEFAULT_HASH = "cde383eee8ee7a4400adf7a15f716f179a2eb97646b37e089eb8d6d04e663416"; // teacher123
 
-          if (!matched && isTeacher && DEMO_TEACHERS.has(userLower) && passHash === TEACHER_DEFAULT_HASH) {
+          if (!matched && (currentRole === "teacher" || currentRole === "admin") && DEMO_TEACHERS.has(userLower) && passHash === TEACHER_DEFAULT_HASH) {
             matched = true;
           }
 
@@ -217,7 +274,7 @@
             if (buttonText) buttonText.textContent = "Opening offline…";
             localStorage.setItem("rollcall_offline_session", "true");
             localStorage.setItem("rollcall_active_teacher_id", userLower);
-            window.location.assign(isTeacher ? "/teacher" : "/student");
+            window.location.assign(config.defaultPath);
             return;
           }
         } catch (_) {}
@@ -234,11 +291,13 @@
     }
   });
 
+  // Initialize role
+  setRole(currentRole, false);
+
   // Register service worker on login page as well
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     });
   }
-
 })();

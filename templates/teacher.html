@@ -367,11 +367,17 @@
             <strong id="saveSummary">0 present · 0 absent</strong>
             <span id="saveHelp">Load a class to begin.</span>
           </div>
-          <button class="btn btn--dark btn--large" id="saveAttendanceButton" type="button" disabled>
-            <span class="btn-spinner" aria-hidden="true"></span>
-            <span class="btn-text" id="saveButtonText">Save attendance</span>
-            <svg class="btn-arrow" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10h12m-5-5l5 5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
+          <div class="roster-savebar-actions">
+            <button class="btn btn--outline btn--large" id="unlockAttendanceButton" type="button" hidden>
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="4" y="9" width="12" height="8" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M7 9V6a3 3 0 016 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="10" cy="13" r="1.2" fill="currentColor"/></svg>
+              <span class="btn-text" id="unlockButtonText">Unlock to edit</span>
+            </button>
+            <button class="btn btn--dark btn--large" id="saveAttendanceButton" type="button" disabled>
+              <span class="btn-spinner" aria-hidden="true"></span>
+              <span class="btn-text" id="saveButtonText">Save attendance</span>
+              <svg class="btn-arrow" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10h12m-5-5l5 5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
         </div>
       </section>
     </section>

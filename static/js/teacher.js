@@ -890,9 +890,16 @@ const state = {
     state.roster = null;
     state.holiday = false;
     state.isExisting = false;
+    state.isLocked = false;
     const card = $("rosterCard");
     card.dataset.state = "prompt";
     card.dataset.holiday = "false";
+    card.classList.remove("is-locked-session");
+    if ($("unlockAttendanceButton")) $("unlockAttendanceButton").hidden = true;
+    if ($("saveAttendanceButton")) {
+      $("saveAttendanceButton").hidden = false;
+      $("saveAttendanceButton").disabled = true;
+    }
     $("holidayBanner").hidden = true;
     $("holidayButton").disabled = true;
     $("holidayButton").classList.remove("is-active");
@@ -1031,6 +1038,7 @@ const state = {
       state.roster = roster;
       state.sessionId = roster.session_id;
       state.isExisting = roster.is_existing;
+      state.isLocked = Boolean(roster.is_existing);
       state.holiday = Boolean(roster.is_holiday);
       state.selected = {
         ...(state.selected || {}),
@@ -1094,15 +1102,17 @@ const state = {
   }
 
   function statusButtons(studentId, status) {
+    const isLocked = Boolean(state.isLocked);
+    const lockedClass = isLocked ? "is-locked" : "";
     return `
-      <div class="status-toggle" role="group" aria-label="Attendance status">
+      <div class="status-toggle ${lockedClass}" role="group" aria-label="Attendance status">
         <button class="status-btn ${status === "present" ? "is-selected" : ""}" type="button"
-          data-student-id="${studentId}" data-status="present" aria-pressed="${status === "present"}">
+          data-student-id="${studentId}" data-status="present" aria-pressed="${status === "present"}" ${isLocked ? "tabindex='-1'" : ""}>
           <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.3l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Present
         </button>
         <button class="status-btn ${status === "absent" ? "is-selected" : ""}" type="button"
-          data-student-id="${studentId}" data-status="absent" aria-pressed="${status === "absent"}">
+          data-student-id="${studentId}" data-status="absent" aria-pressed="${status === "absent"}" ${isLocked ? "tabindex='-1'" : ""}>
           <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           Absent
         </button>
@@ -1153,6 +1163,10 @@ const state = {
     saveState.classList.remove("is-dirty");
     saveState.classList.toggle("is-holiday", state.holiday);
 
+    card.classList.toggle("is-locked-session", Boolean(state.isLocked));
+    const unlockBtn = $("unlockAttendanceButton");
+    const saveBtn = $("saveAttendanceButton");
+
     $("holidayButton").disabled = false;
     $("holidayButton").classList.toggle("is-active", state.holiday);
     setText(
@@ -1163,6 +1177,11 @@ const state = {
     $("rosterSearch").value = "";
 
     if (state.holiday) {
+      if (unlockBtn) unlockBtn.hidden = true;
+      if (saveBtn) {
+        saveBtn.hidden = false;
+        saveBtn.disabled = true;
+      }
       setText("saveState", "Holiday");
       setText("presentCount", "—");
       setText("absentCount", "—");
@@ -1172,21 +1191,64 @@ const state = {
         "saveHelp",
         "Switch to attendance if the class actually happened."
       );
-      $("saveAttendanceButton").disabled = true;
       $("rosterList").innerHTML = holidayPanel();
       filterRoster();
       return;
     }
 
-    setText(
-      "saveState",
-      roster.is_existing ? "Editing saved roll call" : "New roll call"
-    );
+    if (roster.is_existing) {
+      if (state.isLocked) {
+        setText("saveState", "🔒 Locked · Read-only");
+        saveState.classList.add("is-existing");
+        saveState.classList.remove("is-dirty");
+        if (unlockBtn) {
+          unlockBtn.hidden = false;
+          setText("unlockButtonText", "✏️ Unlock to edit");
+        }
+        if (saveBtn) {
+          saveBtn.hidden = true;
+        }
+        setText(
+          "saveHelp",
+          "Roll call is locked to prevent accidental changes. Tap 'Unlock to edit' to make changes."
+        );
+      } else {
+        setText("saveState", "🔓 Editing unlocked");
+        saveState.classList.add("is-existing", "is-dirty");
+        if (unlockBtn) {
+          unlockBtn.hidden = false;
+          setText("unlockButtonText", "🔒 Cancel & Lock");
+        }
+        if (saveBtn) {
+          saveBtn.hidden = false;
+          saveBtn.disabled = false;
+          setText("saveButtonText", "Update attendance");
+        }
+        setText(
+          "saveHelp",
+          "Editing unlocked! Tap Present/Absent to adjust attendance, then click 'Update attendance'."
+        );
+      }
+    } else {
+      state.isLocked = false;
+      setText("saveState", "New roll call");
+      saveState.classList.remove("is-existing", "is-dirty");
+      if (unlockBtn) unlockBtn.hidden = true;
+      if (saveBtn) {
+        saveBtn.hidden = false;
+        saveBtn.disabled = false;
+        setText("saveButtonText", "Save attendance");
+      }
+      setText(
+        "saveHelp",
+        "Everyone starts present. Tap a student to mark them absent."
+      );
+    }
 
     const list = $("rosterList");
     if (!roster.students.length) {
       list.innerHTML = `<div class="roster-empty">This class has no active students.</div>`;
-      $("saveAttendanceButton").disabled = true;
+      if (saveBtn) saveBtn.disabled = true;
       updateRosterCounts();
       return;
     }
@@ -1211,17 +1273,6 @@ const state = {
         .join("") +
       `<div class="roster-empty" id="rosterSearchEmpty" hidden>No student matches that search.</div>`;
 
-    setText(
-      "saveButtonText",
-      roster.is_existing ? "Update attendance" : "Save attendance"
-    );
-    $("saveAttendanceButton").disabled = false;
-    setText(
-      "saveHelp",
-      roster.is_existing
-        ? "Attendance taken. Changes update students immediately."
-        : "Everyone starts present. Tap a student to mark them absent."
-    );
     updateRosterCounts();
     filterRoster();
   }
@@ -1300,21 +1351,20 @@ const state = {
         records,
       });
       state.isExisting = true;
+      state.isLocked = true;
       state.holiday = false;
       state.roster.is_holiday = false;
       state.sessionId = result.session_id;
       state.dirty = false;
       state.roster.is_existing = true;
       state.roster.updated_at = new Date().toISOString();
+      if (state.roster.students) {
+        state.roster.students.forEach((s) => {
+          s.status = state.statuses.get(s.id) || "present";
+        });
+      }
       renderRoster();
-      setText("saveState", "Saved just now");
-      $("saveState").classList.add("is-existing");
-      $("saveState").classList.remove("is-dirty", "is-holiday", "is-offline-saved");
-      setText(
-        "saveHelp",
-        "Changes are live. Students see the updated percentage right away."
-      );
-      toast(result.message);
+      toast(result.message || "Attendance saved and locked successfully! 🔒");
 
       loadDashboard({ silent: true });
       if (state.recordsLoaded) loadRecords({ silent: true });
@@ -1324,7 +1374,13 @@ const state = {
       if (isOffline) {
         queueOfflineAttendance(params, records);
         state.isExisting = true;
+        state.isLocked = true;
         state.dirty = false;
+        if (state.roster.students) {
+          state.roster.students.forEach((s) => {
+            s.status = state.statuses.get(s.id) || "present";
+          });
+        }
         renderRoster();
         setText("saveState", "Saved locally 🕒");
         $("saveState").classList.add("is-existing", "is-offline-saved");
@@ -1390,6 +1446,7 @@ const state = {
     if (!state.roster) return;
     state.holiday = false;
     state.roster.is_holiday = false;
+    state.isLocked = false;
     state.statuses = new Map(
       state.roster.students.map((student) => [student.id, "present"])
     );
@@ -1791,7 +1848,7 @@ const state = {
   });
 
   $("rosterList")?.addEventListener("click", (event) => {
-    if (state.holiday) return;
+    if (state.holiday || state.isLocked) return;
     const button = event.target.closest(".status-btn");
     if (!button || !state.roster) return;
     const studentId = Number(button.dataset.studentId);
@@ -1806,7 +1863,7 @@ const state = {
 
   document.querySelectorAll("[data-bulk]").forEach((button) => {
     button.addEventListener("click", () => {
-      if (!state.roster || state.holiday) return;
+      if (!state.roster || state.holiday || state.isLocked) return;
       const status = button.dataset.bulk;
       state.roster.students.forEach((student) => {
         state.statuses.set(student.id, status);
@@ -1818,6 +1875,28 @@ const state = {
       markDirty();
       updateRosterCounts();
     });
+  });
+
+  $("unlockAttendanceButton")?.addEventListener("click", () => {
+    if (!state.roster || state.holiday) return;
+    if (state.isLocked) {
+      state.isLocked = false;
+      renderRoster();
+      toast("Attendance unlocked for editing. Tap Present/Absent to adjust records. ✏️", "info");
+    } else {
+      state.isLocked = true;
+      if (state.roster.students) {
+        state.statuses = new Map(
+          state.roster.students.map((s) => [
+            s.id,
+            s.status === "absent" ? "absent" : "present",
+          ])
+        );
+      }
+      state.dirty = false;
+      renderRoster();
+      toast("Editing cancelled. Attendance locked. 🔒", "info");
+    }
   });
 
   $("saveAttendanceButton")?.addEventListener("click", saveAttendance);

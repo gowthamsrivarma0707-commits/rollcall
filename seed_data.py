@@ -296,6 +296,13 @@ def seed_database(conn: sqlite3.Connection) -> None:
 
     conn.execute(
         """
+        INSERT INTO admins (username, name, password_hash, created_at, must_change_password)
+        VALUES (?, ?, ?, ?, 0)
+        """,
+        ("ISP", "Administrator (ISP)", hash_password("teacher123"), datetime.now().isoformat(timespec="seconds")),
+    )
+    conn.execute(
+        """
         INSERT INTO admins (username, name, password_hash, created_at)
         VALUES (?, ?, ?, ?)
         """,

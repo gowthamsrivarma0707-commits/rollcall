@@ -69,6 +69,21 @@
 
     <main class="auth-main">
       <div class="auth-main__inner">
+        <div class="auth-role-tabs" id="roleTabs" role="tablist" aria-label="Select login type">
+          <button type="button" class="auth-role-tab is-active" data-role="student" role="tab" aria-selected="true">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 3l8 4.5-8 4.5-8-4.5L10 3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M4 10.5v4c0 2 2.7 3.5 6 3.5s6-1.5 6-3.5v-4" stroke="currentColor" stroke-width="1.6"/></svg>
+            <span>Student</span>
+          </button>
+          <button type="button" class="auth-role-tab" data-role="teacher" role="tab" aria-selected="false">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="3.5" y="4" width="13" height="10" rx="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M7 17h6M10 14v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <span>Faculty</span>
+          </button>
+          <button type="button" class="auth-role-tab" data-role="admin" role="tab" aria-selected="false">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 2.5l6 2.8v4.6c0 4.2-2.7 7.7-6 8.6-3.3-.9-6-4.4-6-8.6V5.3l6-2.8z" stroke="currentColor" stroke-width="1.6"/><path d="M10 7v3.5m0 2.5h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <span>Admin</span>
+          </button>
+        </div>
+
         <div class="auth-heading">
           <div class="role-badge" id="roleBadge">
             <span class="role-badge__dot"></span>

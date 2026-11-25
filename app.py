@@ -1081,12 +1081,19 @@ class RollCallHandler(BaseHTTPRequestHandler):
         if path.startswith("/static/"):
             self._serve_static(path)
             return
-        if path in ("/student/login", "/teacher/login", "/admin/login"):
-            role = path.split("/")[1]
-            session = self._current_session(role)
-            if session and session["role"] == role:
-                self._redirect(f"/{role}")
-                return
+        if path in ("/login", "/student/login", "/teacher/login", "/admin/login"):
+            role = path.split("/")[1] if path != "/login" else None
+            if role:
+                session = self._current_session(role)
+                if session and session["role"] == role:
+                    self._redirect(f"/{role}")
+                    return
+            else:
+                for r in ("admin", "teacher", "student"):
+                    session = self._current_session(r)
+                    if session and session["role"] == r:
+                        self._redirect(f"/{r}")
+                        return
             self._serve_template("login.html")
             return
         if path in ("/student", "/teacher", "/admin"):
@@ -2544,6 +2551,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
                 and not admin
                 and not is_assigned
                 and int(existing["teacher_id"]) != teacher_id
+                and not substitute_requested
             ):
                 holder = conn.execute(
                     "SELECT name FROM teachers WHERE id = ?",
@@ -2553,7 +2561,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
                     403,
                     "This period has already been recorded by "
                     f"{holder['name'] if holder else 'another teacher'}. "
-                    "Ask the principal to correct it.",
+                    "Ask the principal or mark as substitute to correct it.",
                 )
             span = (
                 int(slot["span"])
@@ -2562,20 +2570,38 @@ class RollCallHandler(BaseHTTPRequestHandler):
             )
             created = existing is None
             if existing:
-                # Keep the teacher who actually took the class; an admin
-                # correcting a record must not steal the attribution.
-                session_teacher_id = int(existing["teacher_id"])
-                scheduled_teacher_id = (
-                    int(existing["scheduled_teacher_id"])
-                    if existing["scheduled_teacher_id"]
-                    else (
+                if substitute_requested and not admin:
+                    session_teacher_id = teacher_id
+                    scheduled_teacher_id = (
                         int(slot["primary_teacher_id"])
                         if slot and slot["primary_teacher_id"]
-                        else session_teacher_id
+                        else int(existing["scheduled_teacher_id"] or existing["teacher_id"])
                     )
-                )
-                is_substitution = int(existing["is_substitution"])
-                substitution_note = existing["substitution_note"]
+                    is_substitution = 1
+                    scheduled = conn.execute(
+                        "SELECT name FROM teachers WHERE id = ?",
+                        (scheduled_teacher_id,),
+                    ).fetchone()
+                    substitution_note = note or (
+                        f"Substitute for {scheduled['name']}"
+                        if scheduled
+                        else "Substitute teacher"
+                    )
+                else:
+                    # Keep the teacher who actually took the class; an admin
+                    # correcting a record must not steal the attribution.
+                    session_teacher_id = int(existing["teacher_id"])
+                    scheduled_teacher_id = (
+                        int(existing["scheduled_teacher_id"])
+                        if existing["scheduled_teacher_id"]
+                        else (
+                            int(slot["primary_teacher_id"])
+                            if slot and slot["primary_teacher_id"]
+                            else session_teacher_id
+                        )
+                    )
+                    is_substitution = int(existing["is_substitution"])
+                    substitution_note = existing["substitution_note"]
             elif admin:
                 session_teacher_id = (
                     int(slot["primary_teacher_id"])
