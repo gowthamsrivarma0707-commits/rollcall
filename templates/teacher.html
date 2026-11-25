@@ -597,6 +597,32 @@
     </div>
   </div>
 
+  <!-- MODAL: ALLOCATE FACULTY TO ELECTIVE -->
+  <div class="modal-backdrop" id="modalAllocateFaculty" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalAllocateFacultyTitle" style="max-width:480px;">
+      <div class="modal-head">
+        <div>
+          <span class="section-tag" id="allocateElectiveCode">MCA-SEM2</span>
+          <h3 id="modalAllocateFacultyTitle" style="margin-top:4px;">Allocate Faculty</h3>
+        </div>
+        <button class="modal-close" type="button" data-close-modal aria-label="Close modal">✕</button>
+      </div>
+      <form id="formAllocateFaculty" class="modal-body">
+        <p style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">
+          Choose the faculty member who will teach and manage attendance for <strong id="allocateElectiveName">this elective</strong>.
+        </p>
+        <div class="form-field">
+          <label for="allocateFacultySelect">Select Teacher / Professor *</label>
+          <select id="allocateFacultySelect" required></select>
+        </div>
+        <div class="modal-foot" style="margin-top:16px;">
+          <button class="btn btn--ghost" type="button" data-close-modal>Cancel</button>
+          <button class="btn btn--dark" id="btnSubmitAllocateFaculty" type="submit">Allocate Faculty</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- MODAL: USER PROFILE (ADMIN & TEACHER) -->
   <div class="modal-backdrop" id="modalUserProfile" hidden>
     <div class="modal-card modal--profile" role="dialog" aria-modal="true" aria-labelledby="modalProfileTitle">

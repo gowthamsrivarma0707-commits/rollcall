@@ -355,6 +355,7 @@ const state = {
       try { localStorage.setItem("rollcall_cache_overview", JSON.stringify(data)); } catch (_) {}
       applyActiveTeacherProfile(data);
       state.data = data;
+      state.teachers = data.faculty || [];
       state.classes = data.classes || [];
       state.assignments = data.assignments || [];
       state.timetablesByClass = data.timetables_by_class || {};
@@ -1999,6 +2000,9 @@ const state = {
       const data = await response.json();
       if (!data.ok) throw new Error(data.message || "Failed to load electives.");
       state.electives = data.electives || [];
+      if (Array.isArray(data.faculty) && data.faculty.length) {
+        state.teachers = data.faculty;
+      }
       renderElectiveCards(state.electives);
     } catch (err) {
       grid.innerHTML = `<div class="empty-state"><p>${escapeHTML(err.message)}</p></div>`;
@@ -2012,6 +2016,8 @@ const state = {
       grid.innerHTML = '<div class="empty-state"><p>No electives scheduled for Semester 2.</p></div>';
       return;
     }
+    const isAdmin = Boolean(state.data?.admin_view || window.location.pathname.startsWith("/admin"));
+
     grid.innerHTML = electives
       .map((el) => {
         return `
@@ -2022,9 +2028,16 @@ const state = {
               <span class="live-pill">Sem ${el.semester}</span>
             </div>
             <h3 class="elective-card__title">${escapeHTML(el.name)}</h3>
-            <div class="elective-card__faculty">
-              <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
-              <span>Faculty: <strong>${escapeHTML(el.teacher_name)}</strong></span>
+            <div class="elective-card__faculty" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+              <div style="display:flex; align-items:center; gap:6px; min-width:0;">
+                <svg viewBox="0 0 20 20" fill="currentColor" style="flex-shrink:0;"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
+                <span style="font-size:12px;">Faculty: <strong style="${el.teacher_id ? 'color:var(--text-main);' : 'color:#b45309; font-weight:700;'}">${escapeHTML(el.teacher_name)}</strong></span>
+              </div>
+              ${isAdmin ? `
+                <button class="btn btn--ghost btn--small" type="button" data-allocate-faculty="${el.id}" style="padding:2px 8px; font-size:11px; height:auto; border-radius:4px; font-weight:700; flex-shrink:0;">
+                  ✎ Allocate
+                </button>
+              ` : ''}
             </div>
           </div>
 
@@ -2053,6 +2066,9 @@ const state = {
     });
     grid.querySelectorAll("[data-view-enrolled]").forEach((btn) => {
       btn.addEventListener("click", () => openElectiveRoster(parseInt(btn.dataset.viewEnrolled, 10), "enrolled"));
+    });
+    grid.querySelectorAll("[data-allocate-faculty]").forEach((btn) => {
+      btn.addEventListener("click", () => openAllocateFacultyModal(parseInt(btn.dataset.allocateFaculty, 10)));
     });
   }
 
@@ -2284,6 +2300,61 @@ const state = {
         setButtonLoading(submitBtn, false);
       }
     });
+
+    $("formAllocateFaculty")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!currentAllocatingElectiveId) return;
+      const submitBtn = $("btnSubmitAllocateFaculty");
+      const restore = setButtonLoading ? setButtonLoading(submitBtn, "Allocating…") : () => {};
+
+      const select = $("allocateFacultySelect");
+      const teacherId = select.value ? parseInt(select.value, 10) : null;
+
+      try {
+        const res = await api.post(`/api/electives/${currentAllocatingElectiveId}/assign-faculty`, {
+          teacher_id: teacherId,
+        });
+        toast(res.message || "Faculty allocated successfully!", "success");
+        $("modalAllocateFaculty").hidden = true;
+        loadElectives();
+      } catch (err) {
+        toast(err.message || "Failed to allocate faculty.", "error");
+      } finally {
+        if (typeof restore === "function") restore();
+      }
+    });
+  }
+
+  let currentAllocatingElectiveId = null;
+
+  function openAllocateFacultyModal(electiveId) {
+    const modal = $("modalAllocateFaculty");
+    if (!modal) return;
+    const el = state.electives.find((item) => item.id === electiveId);
+    if (!el) return;
+    currentAllocatingElectiveId = electiveId;
+
+    if ($("allocateElectiveCode")) $("allocateElectiveCode").textContent = el.code;
+    if ($("allocateElectiveName")) $("allocateElectiveName").textContent = `${el.code} (${el.name})`;
+
+    const select = $("allocateFacultySelect");
+    if (select) {
+      const teachers = state.teachers || [];
+      select.innerHTML = `
+        <option value="">-- No Faculty / Unassigned --</option>
+        ${teachers
+          .map(
+            (t) => `
+          <option value="${t.id}" ${el.teacher_id === t.id ? "selected" : ""}>
+            ${escapeHTML(t.name)} (${escapeHTML(t.employee_id)})
+          </option>
+        `
+          )
+          .join("")}
+      `;
+    }
+
+    modal.hidden = false;
   }
 
   /* ---------------------------------------------------------

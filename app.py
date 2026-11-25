@@ -1408,6 +1408,15 @@ class RollCallHandler(BaseHTTPRequestHandler):
                 elective_id = int(parts[3])
                 self._unenroll_elective_student(elective_id, session, is_admin)
                 return
+        if path.startswith("/api/electives/") and path.endswith("/assign-faculty"):
+            session, is_admin = self._require_staff_session()
+            if not is_admin:
+                raise ApiError(403, "Only administrators can assign faculty to electives.")
+            parts = path.split("/")
+            if len(parts) >= 5 and parts[3].isdigit():
+                elective_id = int(parts[3])
+                self._assign_elective_faculty(elective_id, session)
+                return
         if path == "/api/profile/update":
             self._update_profile()
             return
@@ -3139,8 +3148,45 @@ class RollCallHandler(BaseHTTPRequestHandler):
                 "elective_id": cur.lastrowid,
             })
 
+    def _assign_elective_faculty(self, elective_id: int, session: dict) -> None:
+        payload = self._read_json()
+        raw_teacher_id = payload.get("teacher_id")
+        teacher_id = None
+        if raw_teacher_id is not None and str(raw_teacher_id).strip() and str(raw_teacher_id).strip() != "0":
+            teacher_id = parse_integer(raw_teacher_id, "Invalid teacher selected.")
+
+        with get_db() as conn:
+            elective = conn.execute("SELECT id, code, name FROM electives WHERE id = ?", (elective_id,)).fetchone()
+            if not elective:
+                raise ApiError(404, "Elective not found.")
+
+            teacher_name = "Not Assigned"
+            teacher_emp_id = ""
+            if teacher_id:
+                teacher = conn.execute("SELECT id, name, employee_id FROM teachers WHERE id = ?", (teacher_id,)).fetchone()
+                if not teacher:
+                    raise ApiError(404, "Selected teacher not found.")
+                teacher_name = teacher["name"]
+                teacher_emp_id = teacher["employee_id"]
+
+            conn.execute("UPDATE electives SET teacher_id = ? WHERE id = ?", (teacher_id, elective_id))
+            audit(conn, session["role"], session["user_id"], "assign_elective_faculty", f"Allocated {teacher_name} to {elective['code']}")
+            conn.commit()
+
+            self._send_json({
+                "ok": True,
+                "message": f"Faculty allocated for {elective['name']}: {teacher_name}",
+                "teacher_id": teacher_id,
+                "teacher_name": teacher_name if teacher_id else "Faculty Not Assigned",
+                "teacher_employee_id": teacher_emp_id,
+            })
+
     def _get_electives(self, user_id: int, *, is_admin: bool, head_only: bool = False) -> None:
         with get_db() as conn:
+            faculty_list = [
+                {"id": int(row["id"]), "name": row["name"], "employee_id": row["employee_id"]}
+                for row in _all_teachers()
+            ]
             rows = conn.execute(
                 """
                 SELECT e.id, e.code, e.name, e.semester, e.capacity, e.teacher_id,
@@ -3167,7 +3213,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
                     "enrolled_count": int(r["enrolled_count"]),
                     "can_manage": True,
                 })
-            self._send_json({"ok": True, "electives": electives}, head_only=head_only)
+            self._send_json({"ok": True, "electives": electives, "faculty": faculty_list}, head_only=head_only)
 
     def _get_elective_students(self, elective_id: int, user_id: int, *, is_admin: bool, head_only: bool = False) -> None:
         with get_db() as conn:
