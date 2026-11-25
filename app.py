@@ -1360,6 +1360,9 @@ class RollCallHandler(BaseHTTPRequestHandler):
         if path == "/api/admin/students/import":
             self._import_students()
             return
+        if path == "/api/electives/add":
+            self._add_elective()
+            return
         if path.startswith("/api/electives/") and path.endswith("/enroll"):
             session, is_admin = self._require_staff_session()
             parts = path.split("/")
@@ -3054,6 +3057,36 @@ class RollCallHandler(BaseHTTPRequestHandler):
                 "total_imported": imported_count,
                 "skipped": skipped_count,
                 "by_class": dict(by_class_summary),
+            })
+
+    def _add_elective(self) -> None:
+        session, is_admin = self._require_staff_session()
+        payload = self._read_json()
+        code = str(payload.get("code", "")).strip().upper()
+        name = str(payload.get("name", "")).strip()
+        semester = parse_integer(payload.get("semester", 2), "Invalid semester.")
+        teacher_id = parse_integer(payload.get("teacher_id", 0), "Invalid teacher.") if payload.get("teacher_id") else None
+        capacity = parse_integer(payload.get("capacity", 35), "Invalid capacity.")
+
+        if not code or not name:
+            raise ApiError(400, "Elective code and name are required.")
+
+        with get_db() as conn:
+            existing = conn.execute("SELECT id FROM electives WHERE code = ?", (code,)).fetchone()
+            if existing:
+                raise ApiError(400, f"An elective with code {code} already exists.")
+
+            cur = conn.execute(
+                "INSERT INTO electives (code, name, semester, teacher_id, capacity) VALUES (?, ?, ?, ?, ?)",
+                (code, name, semester, teacher_id, capacity),
+            )
+            audit(conn, session["role"], session["user_id"], "create_elective", f"{code} - {name}")
+            conn.commit()
+
+            self._send_json({
+                "ok": True,
+                "message": f"Elective {name} ({code}) created successfully.",
+                "elective_id": cur.lastrowid,
             })
 
     def _get_electives(self, user_id: int, *, is_admin: bool, head_only: bool = False) -> None:

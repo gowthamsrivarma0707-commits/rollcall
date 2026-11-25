@@ -372,6 +372,7 @@ const state = {
         initializeRecordFilters();
         initializeStudentsControls();
         initializeStudentsExport();
+        initializeAddElective();
         state.initialized = true;
       } else if (state.view === "mark") {
         renderMarkSlots();
@@ -2030,9 +2031,12 @@ const state = {
             </div>
           </div>
 
-          <div class="elective-card__foot">
-            <button class="btn btn--dark btn--small" type="button" data-manage-elective="${el.id}">
-              Manage Roster →
+          <div class="elective-card__foot" style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
+            <button class="btn btn--ghost btn--small" type="button" data-view-enrolled="${el.id}">
+              Enrolled (${el.enrolled_count})
+            </button>
+            <button class="btn btn--lime btn--small" type="button" data-add-students="${el.id}" style="font-weight:700;">
+              + Add Students
             </button>
           </div>
         </article>
@@ -2040,22 +2044,26 @@ const state = {
       })
       .join("");
 
-    grid.querySelectorAll("[data-manage-elective]").forEach((btn) => {
-      btn.addEventListener("click", () => openElectiveRoster(parseInt(btn.dataset.manageElective, 10)));
+    grid.querySelectorAll("[data-add-students]").forEach((btn) => {
+      btn.addEventListener("click", () => openElectiveRoster(parseInt(btn.dataset.addStudents, 10), "add"));
+    });
+    grid.querySelectorAll("[data-view-enrolled]").forEach((btn) => {
+      btn.addEventListener("click", () => openElectiveRoster(parseInt(btn.dataset.viewEnrolled, 10), "enrolled"));
     });
   }
 
-  async function openElectiveRoster(electiveId) {
+  async function openElectiveRoster(electiveId, initialTab = "add") {
     const modal = $("modalElectiveRoster");
     if (!modal) return;
     modal.hidden = false;
 
-    $("tabEnrolledStudents").classList.add("is-active");
-    $("tabAddStudents").classList.remove("is-active");
-    $("paneEnrolledStudents").hidden = false;
-    $("paneAddStudents").hidden = true;
-    $("rosterEnrolledSearch").value = "";
-    $("rosterAddSearch").value = "";
+    const isAdd = initialTab === "add";
+    $("tabAddStudents")?.classList.toggle("is-active", isAdd);
+    $("tabEnrolledStudents")?.classList.toggle("is-active", !isAdd);
+    if ($("paneAddStudents")) $("paneAddStudents").hidden = !isAdd;
+    if ($("paneEnrolledStudents")) $("paneEnrolledStudents").hidden = isAdd;
+    if ($("rosterEnrolledSearch")) $("rosterEnrolledSearch").value = "";
+    if ($("rosterAddSearch")) $("rosterAddSearch").value = "";
     activeRosterSection = "all";
 
     $("rosterSectionPills")?.querySelectorAll(".section-pill").forEach((p) => {
@@ -2234,6 +2242,44 @@ const state = {
     } catch (err) {
       toast(err.message, "error");
     }
+  }
+
+  function initializeAddElective() {
+    $("btnOpenAddElective")?.addEventListener("click", () => {
+      const modal = $("modalAddElective");
+      if (!modal) return;
+      modal.hidden = false;
+      const teacherSelect = $("newElectiveTeacher");
+      if (teacherSelect && state.teachers) {
+        teacherSelect.innerHTML = state.teachers
+          .map((t) => `<option value="${t.id}">${escapeHtml(t.name)} (${escapeHtml(t.employee_id)})</option>`)
+          .join("");
+      }
+    });
+
+    $("formAddElective")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const submitBtn = $("btnSubmitAddElective");
+      setButtonLoading(submitBtn, true);
+      try {
+        const payload = {
+          code: $("newElectiveCode").value.trim(),
+          name: $("newElectiveName").value.trim(),
+          teacher_id: $("newElectiveTeacher").value ? parseInt($("newElectiveTeacher").value, 10) : null,
+          capacity: parseInt($("newElectiveCapacity").value, 10) || 35,
+          semester: 2,
+        };
+        const res = await api.post("/api/electives/add", payload);
+        toast(res.message, "success");
+        $("modalAddElective").hidden = true;
+        $("formAddElective").reset();
+        loadElectives();
+      } catch (err) {
+        toast(err.message, "error");
+      } finally {
+        setButtonLoading(submitBtn, false);
+      }
+    });
   }
 
   /* ---------------------------------------------------------
