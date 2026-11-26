@@ -302,27 +302,33 @@ const state = {
     rk: { id: 6, employee_id: "RK", name: "Dr. G. Rama Krishna", email: "rk@gvpihlr.edu.in", department: "School of Science" },
     pvrc: { id: 7, employee_id: "PVRC", name: "Mr. P. V. R. Chandrasekhar", email: "pvrc@gvpihlr.edu.in", department: "School of Science" },
     ymg: { id: 8, employee_id: "YMG", name: "Mrs. Y. Mpunika Gayatri", email: "ymg@gvpihlr.edu.in", department: "School of Science" },
-    principal: { id: 1, employee_id: "PRP", name: "Mrs. P. Ratna Pavani", email: "prp@gvpihlr.edu.in", department: "School of Science", admin_view: true }
+    principal: { id: 1, employee_id: "PRINCIPAL", name: "Principal", email: "principal@gvpihlr.edu.in", department: "Administration", admin_view: true }
   };
 
   function applyActiveTeacherProfile(data) {
     if (!data) return;
     const activeKey = (localStorage.getItem("rollcall_active_teacher_id") || "").toLowerCase().trim();
     const profile = TEACHER_PROFILES[activeKey];
-    if (!profile) return;
 
-    data.teacher = profile;
-    if (profile.admin_view) {
+    // Only fallback to static mock profile if server didn't provide a teacher object
+    if (!data.teacher && profile) {
+      data.teacher = profile;
+    }
+
+    const isAdmin = Boolean(data.admin_view || profile?.admin_view || activeKey === "principal" || activeKey === "isp");
+    if (isAdmin) {
       data.admin_view = true;
     }
+
+    const teacherEmpId = (data.teacher?.employee_id || profile?.employee_id || "").toUpperCase();
 
     if (Array.isArray(data.timetable)) {
       data.timetable.forEach((day) => {
         (day.slots || []).forEach((slot) => {
-          if (profile.admin_view) {
+          if (data.admin_view) {
             slot.can_mark = true;
             slot.can_substitute = false;
-          } else if (slot.faculty && slot.faculty.toUpperCase().includes(profile.employee_id)) {
+          } else if (slot.faculty && teacherEmpId && slot.faculty.toUpperCase().includes(teacherEmpId)) {
             slot.can_mark = true;
             slot.can_substitute = false;
           } else {
@@ -335,10 +341,10 @@ const state = {
 
     if (data.today && Array.isArray(data.today.slots)) {
       data.today.slots.forEach((slot) => {
-        if (profile.admin_view) {
+        if (data.admin_view) {
           slot.can_mark = true;
           slot.can_substitute = false;
-        } else if (slot.faculty && slot.faculty.toUpperCase().includes(profile.employee_id)) {
+        } else if (slot.faculty && teacherEmpId && slot.faculty.toUpperCase().includes(teacherEmpId)) {
           slot.can_mark = true;
           slot.can_substitute = false;
         } else {
