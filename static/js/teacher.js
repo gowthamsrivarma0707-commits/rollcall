@@ -2013,7 +2013,7 @@ const state = {
     const grid = $("electivesGrid");
     if (!grid) return;
     if (!electives.length) {
-      grid.innerHTML = '<div class="empty-state"><p>No electives scheduled for Semester 2.</p></div>';
+      grid.innerHTML = '<div class="empty-state"><p>No electives scheduled.</p></div>';
       return;
     }
     const isAdmin = Boolean(state.data?.admin_view || window.location.pathname.startsWith("/admin"));
@@ -2025,7 +2025,7 @@ const state = {
           <div>
             <div class="elective-card__head">
               <span class="section-tag">${escapeHTML(el.code)}</span>
-              <span class="live-pill">Sem ${el.semester}</span>
+              <span class="live-pill">Elective</span>
             </div>
             <h3 class="elective-card__title">${escapeHTML(el.name)}</h3>
             <div class="elective-card__faculty" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
