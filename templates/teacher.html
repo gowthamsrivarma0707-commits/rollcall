@@ -494,9 +494,6 @@
           <h1>Electives Management</h1>
           <p class="welcome-sub">Select students for each elective subject. Rule: 1 student is allowed for 1 elective only!</p>
         </div>
-        <button class="btn btn--dark" id="btnOpenAddElective" type="button">
-          + Add Elective Subject
-        </button>
       </div>
 
       <div class="card electives-banner-card">
@@ -566,34 +563,6 @@
       <div class="modal-foot">
         <button class="btn btn--ghost" type="button" data-close-modal>Close</button>
       </div>
-    </div>
-  </div>
-
-  <!-- MODAL: ADD ELECTIVE -->
-  <div class="modal-backdrop" id="modalAddElective" hidden>
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalAddElectiveTitle">
-      <div class="modal-head">
-        <h3 id="modalAddElectiveTitle">Add Elective Subject</h3>
-        <button class="modal-close" type="button" data-close-modal aria-label="Close modal">✕</button>
-      </div>
-      <form id="formAddElective" class="modal-body">
-        <div class="form-field">
-          <label for="newElectiveCode">Subject Code *</label>
-          <input id="newElectiveCode" type="text" placeholder="Subject code" autocapitalize="characters" required>
-        </div>
-        <div class="form-field">
-          <label for="newElectiveName">Subject Title / Name *</label>
-          <input id="newElectiveName" type="text" placeholder="Subject name" required>
-        </div>
-        <div class="form-field">
-          <label for="newElectiveTeacher">Faculty In-Charge</label>
-          <select id="newElectiveTeacher"></select>
-        </div>
-        <div class="modal-foot">
-          <button class="btn btn--ghost" type="button" data-close-modal>Cancel</button>
-          <button class="btn btn--dark" id="btnSubmitAddElective" type="submit">Create Elective</button>
-        </div>
-      </form>
     </div>
   </div>
 

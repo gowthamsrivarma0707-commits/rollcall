@@ -2023,6 +2023,9 @@ const state = {
       return;
     }
     const isAdmin = Boolean(state.data?.admin_view || window.location.pathname.startsWith("/admin"));
+    if ($("btnOpenAddElective")) {
+      $("btnOpenAddElective").style.display = isAdmin ? "" : "none";
+    }
 
     grid.innerHTML = electives
       .map((el) => {
@@ -2271,6 +2274,10 @@ const state = {
   }
 
   function initializeAddElective() {
+    const isAdmin = Boolean(state.data?.admin_view || window.location.pathname.startsWith("/admin"));
+    if ($("btnOpenAddElective")) {
+      $("btnOpenAddElective").style.display = isAdmin ? "" : "none";
+    }
     $("btnOpenAddElective")?.addEventListener("click", () => {
       const modal = $("modalAddElective");
       if (!modal) return;

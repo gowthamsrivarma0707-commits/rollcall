@@ -3149,6 +3149,8 @@ class RollCallHandler(BaseHTTPRequestHandler):
 
     def _add_elective(self) -> None:
         session, is_admin = self._require_staff_session()
+        if not is_admin:
+            raise ApiError(403, "Only administrators can add new elective subjects.")
         payload = self._read_json()
         code = str(payload.get("code", "")).strip().upper()
         name = str(payload.get("name", "")).strip()
