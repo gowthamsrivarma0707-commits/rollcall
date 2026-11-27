@@ -35,7 +35,7 @@ STUDENT_PASSWORD = os.environ.get("ROLLCALL_STUDENT_PASSWORD") or DEMO_STUDENT_P
 TEACHER_PASSWORD = os.environ.get("ROLLCALL_TEACHER_PASSWORD") or DEMO_TEACHER_PASSWORD
 ADMIN_PASSWORD = os.environ.get("ROLLCALL_ADMIN_PASSWORD") or DEMO_ADMIN_PASSWORD
 
-WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
+WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
 
 PERIODS = (
     {"period": 1, "start": "09:00", "end": "10:00"},
@@ -162,6 +162,13 @@ TIMETABLE = [
     (4, 4, 1, "FLAT", "BD", "BD"),
     (4, 5, 1, "DS", "VL", "VL"),
     (4, 6, 1, "OR", "PSR", "PSR"),
+    # Saturday (5)
+    (5, 1, 1, "AI", "PRP", "PRP"),
+    (5, 2, 1, "OR", "PSR", "PSR"),
+    (5, 3, 1, "ADDS", "CHSSRP", "CHSSRP"),
+    (5, 4, 1, "FLAT", "BD", "BD"),
+    (5, 5, 1, "DS", "VL", "VL"),
+    (5, 6, 1, "PE", "RK", "RK"),
 ]
 
 STUDENTS = [

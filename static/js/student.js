@@ -225,7 +225,7 @@
       return;
     }
 
-    const days = timetable.slice(0, 5);
+    const days = timetable;
     const columns = days.map((day) => {
       const byPeriod = new Map();
       day.slots.forEach((slot) => byPeriod.set(slot.period, slot));
@@ -270,10 +270,10 @@
       });
       body += "</tr>";
       if (period === 2) {
-        body += `<tr class="tt-break-row"><th>Break</th><td colspan="5">11:00 – 11:15 AM</td></tr>`;
+        body += `<tr class="tt-break-row"><th>Break</th><td colspan="${days.length}">11:00 – 11:15 AM</td></tr>`;
       }
       if (period === 4) {
-        body += `<tr class="tt-break-row"><th>Lunch</th><td colspan="5">1:15 – 2:15 PM</td></tr>`;
+        body += `<tr class="tt-break-row"><th>Lunch</th><td colspan="${days.length}">1:15 – 2:15 PM</td></tr>`;
       }
     }
     body += "</tbody>";

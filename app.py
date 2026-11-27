@@ -348,6 +348,35 @@ def init_db(reset: bool = False) -> None:
         # Remove deprecated Administrator account if present
         conn.execute("DELETE FROM admins WHERE username = 'Administrator' COLLATE NOCASE")
 
+        # Ensure Saturday timetable is seeded
+        sat_count = conn.execute("SELECT COUNT(*) FROM timetable WHERE weekday = 5").fetchone()[0]
+        if sat_count == 0:
+            from seed_data import TIMETABLE
+            classes = conn.execute("SELECT id FROM classes").fetchall()
+            subject_ids = {row["code"]: row["id"] for row in conn.execute("SELECT id, code FROM subjects")}
+            teacher_ids = {row["employee_id"]: row["id"] for row in conn.execute("SELECT id, employee_id FROM teachers")}
+            sat_entries = [entry for entry in TIMETABLE if entry[0] == 5]
+            for class_row in classes:
+                cid = class_row["id"]
+                for (weekday, period, span, subject_code, faculty_label, primary_employee_id) in sat_entries:
+                    conn.execute(
+                        """
+                        INSERT OR IGNORE INTO timetable
+                            (class_id, weekday, period, span, subject_id,
+                             primary_teacher_id, faculty_label)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            cid,
+                            weekday,
+                            period,
+                            span,
+                            subject_ids[subject_code],
+                            teacher_ids[primary_employee_id],
+                            faculty_label,
+                        ),
+                    )
+
         # Ensure default Sem-2 Electives are present
         elective_cnt = conn.execute("SELECT COUNT(*) FROM electives").fetchone()[0]
         if elective_cnt == 0:
@@ -1952,7 +1981,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
             timetable = timetable_days(conn, student["class_id"])
             today = date.today()
             today_slots: list[dict] = []
-            if today.weekday() < 5:
+            if today.weekday() < len(WEEKDAYS):
                 today_slots = [
                     dict(slot)
                     for slot in timetable[today.weekday()]["slots"]
@@ -1990,7 +2019,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
                 "date": today.isoformat(),
                 "day": (
                     WEEKDAYS[today.weekday()]
-                    if today.weekday() < 5
+                    if today.weekday() < len(WEEKDAYS)
                     else ""
                 ),
                 "slots": today_slots,
@@ -2265,7 +2294,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
         timetable = timetables_by_class.get(str(class_id), []) if class_id else []
         today = date.today()
         today_slots: list[dict] = []
-        if today.weekday() < 5 and timetable:
+        if today.weekday() < len(WEEKDAYS) and timetable:
             today_slots = [
                 dict(slot) for slot in timetable[today.weekday()]["slots"]
             ]
@@ -2326,7 +2355,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
                 "date": today.isoformat(),
                 "day": (
                     WEEKDAYS[today.weekday()]
-                    if today.weekday() < 5
+                    if today.weekday() < len(WEEKDAYS)
                     else ""
                 ),
                 "slots": today_slots,
