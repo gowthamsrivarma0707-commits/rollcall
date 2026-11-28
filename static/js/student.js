@@ -10,6 +10,7 @@
     formatDate,
     formatTime,
     plural,
+    setButtonLoading,
   } = window.RollCall;
 
   const $ = (id) => document.getElementById(id);
