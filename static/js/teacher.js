@@ -2894,12 +2894,16 @@ const state = {
   $("formFirstLoginPassword")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const firstError = $("firstLoginError");
-    if (firstError) firstError.hidden = true;
+    if (firstError) {
+      firstError.hidden = true;
+      firstError.style.display = "none";
+    }
     const p1 = $("firstNewPassword")?.value || "";
     const p2 = $("firstConfirmPassword")?.value || "";
     if (p1.length < 8) {
       if (firstError) {
         firstError.hidden = false;
+        firstError.style.display = "block";
         firstError.textContent = "Password must be at least 8 characters long.";
       }
       return;
@@ -2907,12 +2911,14 @@ const state = {
     if (p1 !== p2) {
       if (firstError) {
         firstError.hidden = false;
-        firstError.textContent = "Passwords do not match.";
+        firstError.style.display = "block";
+        firstError.textContent = "Passwords do not match. Please re-enter.";
       }
       return;
     }
     const btnFirstSubmit = $("btnSubmitFirstLoginPassword");
     setButtonLoading(btnFirstSubmit, true);
+    if (btnFirstSubmit) btnFirstSubmit.textContent = "Saving & Forwarding…";
     try {
       const res = await api.post("/api/first-login/change-password", {
         new_password: p1,
@@ -2923,15 +2929,22 @@ const state = {
         modal.style.display = "none";
         modal.hidden = true;
       }
-      toast(res.message || "Password updated successfully!");
-      loadDashboard({ silent: true });
+      try {
+        sessionStorage.setItem(
+          "rollcall_just_set_password",
+          res.message || "Password updated successfully! Welcome to your dashboard."
+        );
+      } catch (_) {}
+      // Forward directly into the faculty dashboard
+      window.location.replace("/teacher");
     } catch (err) {
       if (firstError) {
         firstError.hidden = false;
+        firstError.style.display = "block";
         firstError.textContent = err.message || "Failed to update password.";
       }
-    } finally {
       setButtonLoading(btnFirstSubmit, false);
+      if (btnFirstSubmit) btnFirstSubmit.textContent = "Save Password & Continue →";
     }
   });
 

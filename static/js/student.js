@@ -619,12 +619,16 @@
 
   formFirstLogin?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (firstError) firstError.hidden = true;
+    if (firstError) {
+      firstError.hidden = true;
+      firstError.style.display = "none";
+    }
     const p1 = $("firstNewPassword")?.value || "";
     const p2 = $("firstConfirmPassword")?.value || "";
     if (p1.length < 8) {
       if (firstError) {
         firstError.hidden = false;
+        firstError.style.display = "block";
         firstError.textContent = "Password must be at least 8 characters long.";
       }
       return;
@@ -632,11 +636,13 @@
     if (p1 !== p2) {
       if (firstError) {
         firstError.hidden = false;
-        firstError.textContent = "Passwords do not match.";
+        firstError.style.display = "block";
+        firstError.textContent = "Passwords do not match. Please re-enter.";
       }
       return;
     }
     setButtonLoading(btnFirstSubmit, true);
+    if (btnFirstSubmit) btnFirstSubmit.textContent = "Saving & Forwarding…";
     try {
       const res = await api.post("/api/first-login/change-password", {
         new_password: p1,
@@ -647,21 +653,33 @@
         modal.style.display = "none";
         modal.hidden = true;
       }
-      if (window.RollCall?.toast) {
-        window.RollCall.toast(res.message || "Password updated successfully!");
-      } else {
-        alert(res.message || "Password updated successfully!");
-      }
-      load({ silent: true });
+      try {
+        sessionStorage.setItem(
+          "rollcall_just_set_password",
+          res.message || "Password updated successfully! Welcome to your dashboard."
+        );
+      } catch (_) {}
+      // Forward directly into the student dashboard
+      window.location.replace("/student");
     } catch (err) {
       if (firstError) {
         firstError.hidden = false;
+        firstError.style.display = "block";
         firstError.textContent = err.message || "Failed to update password.";
       }
-    } finally {
       setButtonLoading(btnFirstSubmit, false);
+      if (btnFirstSubmit) btnFirstSubmit.textContent = "Save Password & Continue →";
     }
   });
+
+  // Check if student just completed first-time password setup and show success toast
+  try {
+    const welcomeMsg = sessionStorage.getItem("rollcall_just_set_password");
+    if (welcomeMsg) {
+      sessionStorage.removeItem("rollcall_just_set_password");
+      window.RollCall?.toast(welcomeMsg, "success");
+    }
+  } catch (_) {}
 
   load();
 })();
