@@ -51,7 +51,34 @@ const state = {
     recordsSeq: 0,
     loadingStudents: false,
     studentsSeq: 0,
+    filterShortageOnly: false,
+    lastStudentsData: null,
   };
+
+  const PERIOD_TIMINGS = {
+    1: { start: 9 * 60, end: 10 * 60 },
+    2: { start: 10 * 60, end: 11 * 60 },
+    3: { start: 11 * 60 + 15, end: 12 * 60 + 15 },
+    4: { start: 12 * 60 + 15, end: 13 * 60 + 15 },
+    5: { start: 14 * 60 + 15, end: 15 * 60 + 15 },
+    6: { start: 15 * 60 + 15, end: 16 * 60 + 15 },
+    7: { start: 16 * 60 + 15, end: 17 * 60 + 15 },
+  };
+
+  function isPeriodNow(period, span = 1) {
+    const pStart = Number(period);
+    const pSpan = Number(span) || 1;
+    const pEnd = pStart + pSpan - 1;
+    const startTiming = PERIOD_TIMINGS[pStart];
+    const endTiming = PERIOD_TIMINGS[pEnd] || PERIOD_TIMINGS[pStart];
+    if (!startTiming || !endTiming) return false;
+
+    const now = new Date();
+    if (now.getDay() === 0) return false;
+
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    return currentMinutes >= startTiming.start && currentMinutes < endTiming.end;
+  }
 
   const setText = (id, value) => {
     const node = $(id);
@@ -586,12 +613,14 @@ const state = {
       .map((slot) => {
         const kind = slotKind(slot.span);
         const available = slot.can_mark || slot.can_substitute;
+        const isLive = !slot.is_holiday && isPeriodNow(slot.period, slot.span);
         return `
-          <button class="tt-strip__slot ${available ? "" : "is-locked"} ${slot.can_substitute ? "is-substitute" : ""} ${slot.is_holiday ? "is-holiday" : ""}" type="button"
+          <button class="tt-strip__slot ${available ? "" : "is-locked"} ${slot.can_substitute ? "is-substitute" : ""} ${slot.is_holiday ? "is-holiday" : ""} ${isLive ? "is-live-now" : ""}" type="button"
             data-today-slot data-subject-id="${slot.subject_id}" data-period="${slot.period}" data-can-mark="${slot.can_mark ? 1 : 0}" data-can-substitute="${slot.can_substitute ? 1 : 0}">
             <span class="tt-strip__time">${escapeHTML(slot.time_label)}</span>
             <span class="tt-strip__subject"><b>${escapeHTML(slot.subject_code)}</b> ${escapeHTML(slot.subject_name)}</span>
             <span class="tt-strip__meta">${escapeHTML(slot.period_label)} · ${escapeHTML(slot.faculty || "—")}${slot.span > 1 ? ` · ${spanWords(slot.span)}` : ""}</span>
+            ${isLive ? '<span class="live-pulse-badge"><span class="live-dot"></span>LIVE</span>' : ""}
             ${slot.is_holiday ? '<span class="holiday-chip">Holiday</span>' : ""}
             ${slot.can_substitute ? '<span class="tt-strip__sub">Substitute</span>' : ""}
             ${kind && !slot.is_holiday && !slot.can_substitute ? `<span class="tt-strip__kind">${escapeHTML(kind)}</span>` : ""}
@@ -905,12 +934,14 @@ const state = {
           state.selected.subject_id === slot.subject_id;
         const kind = slotKind(slot.span);
         const available = slot.can_mark || slot.can_substitute;
+        const isToday = date === state.today;
+        const isLive = isToday && !slot.is_holiday && isPeriodNow(slot.period, slot.span);
         return `
-          <button class="slot-card ${selected ? "is-selected" : ""} ${available ? "" : "is-locked"} ${slot.can_substitute ? "is-substitute" : ""} ${slot.is_holiday ? "is-holiday" : ""}" type="button"
+          <button class="slot-card ${selected ? "is-selected" : ""} ${available ? "" : "is-locked"} ${slot.can_substitute ? "is-substitute" : ""} ${slot.is_holiday ? "is-holiday" : ""} ${isLive ? "is-live-now" : ""}" type="button"
             data-slot data-subject-id="${slot.subject_id}" data-period="${slot.period}" data-can-mark="${slot.can_mark ? 1 : 0}" data-can-substitute="${slot.can_substitute ? 1 : 0}"
             ${available ? "" : "disabled"}>
             <span class="slot-card__top">
-              <span class="slot-card__period">${escapeHTML(slot.period_label)}</span>
+              <span class="slot-card__period">${escapeHTML(slot.period_label)}${isLive ? ' <span class="live-pulse-badge"><span class="live-dot"></span>LIVE</span>' : ""}</span>
               <span class="slot-card__time">${escapeHTML(slot.time_label)}</span>
             </span>
             <span class="slot-card__subject"><b>${escapeHTML(slot.subject_code)}</b>${escapeHTML(slot.subject_name)}</span>
@@ -1904,31 +1935,49 @@ const state = {
     )} more</span>`;
   }
 
+  function updateShortageFilterBtn() {
+    const btn = $("filterShortageBtn");
+    if (!btn) return;
+    if (state.filterShortageOnly) {
+      btn.classList.add("is-active");
+      btn.innerHTML = `<span class="shortage-btn-icon">✓</span> <span class="shortage-btn-text">Showing &lt;75% Only</span>`;
+    } else {
+      btn.classList.remove("is-active");
+      btn.innerHTML = `<span class="shortage-btn-icon">⚠️</span> <span class="shortage-btn-text">Shortage (&lt;75%)</span>`;
+    }
+  }
+
   function renderStudents(data) {
     const tbody = $("studentsBody");
     if (!tbody) return;
+    state.lastStudentsData = data;
+    updateShortageFilterBtn();
+
     const summary = data.summary || {
       total: 0,
       on_track: 0,
       below_75: 0,
       no_data: 0,
     };
-    setText(
-      "studentsCount",
-      `${summary.total} ${plural(summary.total, "student")} · ${
-        summary.below_75
-      } below 75%`
-    );
 
-    if (!data.students.length) {
+    const displayStudents = state.filterShortageOnly
+      ? data.students.filter((s) => s.total > 0 && s.status === "below")
+      : data.students;
+
+    const countText = state.filterShortageOnly
+      ? `${displayStudents.length} of ${summary.total} students · ⚠️ Showing <75% Shortage`
+      : `${summary.total} ${plural(summary.total, "student")} · ${summary.below_75} below 75%`;
+    setText("studentsCount", countText);
+
+    if (!displayStudents.length) {
       tbody.innerHTML = `<tr><td colspan="7" class="table-empty">
-        <strong>No students found</strong>
-        <p>This class has no active students yet.</p>
+        <strong>${state.filterShortageOnly ? "No students below 75%! 🎉" : "No students found"}</strong>
+        <p>${state.filterShortageOnly ? "All students in this class/subject are currently at or above 75% attendance." : "This class has no active students yet."}</p>
       </td></tr>`;
       return;
     }
 
-    tbody.innerHTML = data.students
+    tbody.innerHTML = displayStudents
       .map((student, index) => {
         const low = student.total > 0 && student.status === "below";
         const pct = student.total ? formatPercent(student.percentage) : "—";
@@ -2814,6 +2863,13 @@ const state = {
   $("studentsRefreshButton")?.addEventListener("click", () => loadStudents());
   $("studentsDownloadButton")?.addEventListener("click", downloadStudentsReport);
   $("studentsDownloadPdfButton")?.addEventListener("click", downloadStudentsPdfReport);
+  $("filterShortageBtn")?.addEventListener("click", () => {
+    state.filterShortageOnly = !state.filterShortageOnly;
+    updateShortageFilterBtn();
+    if (state.lastStudentsData) {
+      renderStudents(state.lastStudentsData);
+    }
+  });
 
   document.addEventListener("click", (event) => {
     const openButton = event.target.closest("[data-open-mark]");

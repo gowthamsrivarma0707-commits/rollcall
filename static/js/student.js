@@ -26,6 +26,31 @@
     "4:15 PM",
   ];
 
+  const PERIOD_TIMINGS = {
+    1: { start: 9 * 60, end: 10 * 60 },
+    2: { start: 10 * 60, end: 11 * 60 },
+    3: { start: 11 * 60 + 15, end: 12 * 60 + 15 },
+    4: { start: 12 * 60 + 15, end: 13 * 60 + 15 },
+    5: { start: 14 * 60 + 15, end: 15 * 60 + 15 },
+    6: { start: 15 * 60 + 15, end: 16 * 60 + 15 },
+    7: { start: 16 * 60 + 15, end: 17 * 60 + 15 },
+  };
+
+  function isPeriodNow(period, span = 1) {
+    const pStart = Number(period);
+    const pSpan = Number(span) || 1;
+    const pEnd = pStart + pSpan - 1;
+    const startTiming = PERIOD_TIMINGS[pStart];
+    const endTiming = PERIOD_TIMINGS[pEnd] || PERIOD_TIMINGS[pStart];
+    if (!startTiming || !endTiming) return false;
+
+    const now = new Date();
+    if (now.getDay() === 0) return false;
+
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    return currentMinutes >= startTiming.start && currentMinutes < endTiming.end;
+  }
+
   function periodRange(period, span) {
     const count = Number(span) || 1;
     return count > 1 ? `P${period}–P${period + count - 1}` : `P${period}`;
@@ -317,8 +342,9 @@
     list.innerHTML = slots
       .map((slot) => {
         const kind = slotKind(slot.span);
+        const isLive = !slot.is_holiday && isPeriodNow(slot.period, slot.span);
         return `
-          <div class="today-class ${slot.is_holiday ? "is-holiday" : ""}">
+          <div class="today-class ${slot.is_holiday ? "is-holiday" : ""} ${isLive ? "is-live-now" : ""}">
             <span class="today-class__time">${escapeHTML(slot.time_label)}</span>
             <span class="today-class__main">
               <span class="today-class__subject">
@@ -328,6 +354,7 @@
               <span class="today-class__meta">${escapeHTML(slot.period_label)} · ${escapeHTML(slot.faculty || "—")}${slot.span > 1 ? ` · ${spanWords(slot.span)}` : ""}</span>
             </span>
             <span class="today-class__tags">
+              ${isLive ? '<span class="live-pulse-badge"><span class="live-dot"></span>Happening Now</span>' : ""}
               ${slot.span > 1 ? `<span class="tt-badge">${escapeHTML(kind)}</span>` : ""}
               ${slot.is_holiday ? '<span class="holiday-chip">Holiday</span>' : ""}
             </span>

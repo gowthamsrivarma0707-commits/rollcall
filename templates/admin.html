@@ -15,9 +15,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/base.css?v=3.1">
-  <link rel="stylesheet" href="/static/css/app.css?v=3.1">
-  <link rel="stylesheet" href="/static/css/teacher.css?v=3.1">
+  <link rel="stylesheet" href="/static/css/base.css?v=3.2">
+  <link rel="stylesheet" href="/static/css/app.css?v=3.2">
+  <link rel="stylesheet" href="/static/css/teacher.css?v=3.2">
 </head>
 <body class="app-page teacher-page">
   <header class="app-header app-header--teacher">
@@ -458,6 +458,11 @@
           <label for="studentsSubjectFilter">Subject</label>
           <select id="studentsSubjectFilter"></select>
         </div>
+        <div class="form-field form-field--compact" style="align-self:flex-end;">
+          <button type="button" class="btn btn--outline btn--small filter-shortage-btn" id="filterShortageBtn" title="Filter to show only students below 75%">
+            <span class="shortage-btn-icon">⚠️</span> <span class="shortage-btn-text">Shortage (&lt;75%)</span>
+          </button>
+        </div>
         <span class="records-filter__count" id="studentsCount">— students</span>
       </section>
 
@@ -852,7 +857,7 @@
     </div>
   </main>
 
-  <script src="/static/js/common.js?v=2.7"></script>
-  <script src="/static/js/teacher.js?v=2.7"></script>
+  <script src="/static/js/common.js?v=3.2"></script>
+  <script src="/static/js/teacher.js?v=3.2"></script>
 </body>
 </html>
