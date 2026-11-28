@@ -1826,3 +1826,289 @@
   color: var(--ink-soft);
 }
 
+/* =========================================================
+   Dark Theme Polish for Student & Shared Dashboard
+   ========================================================= */
+html.dark-theme .app-header {
+  background: rgba(11, 20, 17, 0.9);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.7);
+}
+
+html.dark-theme .context-pill {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+html.dark-theme .profile-chip {
+  background: var(--surface);
+  border-color: var(--line);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+html.dark-theme .profile-chip__text strong {
+  color: var(--ink);
+}
+
+html.dark-theme .profile-chip__text small {
+  color: var(--muted);
+}
+
+html.dark-theme .profile-chip .icon-button--quiet {
+  color: var(--muted);
+}
+
+html.dark-theme .profile-chip .icon-button--quiet:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+html.dark-theme .welcome-badge {
+  background: var(--surface);
+  border-color: var(--line);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+html.dark-theme .welcome-badge__icon {
+  background: var(--surface-2);
+  color: var(--lime);
+}
+
+html.dark-theme .welcome-badge strong {
+  color: var(--ink);
+}
+
+html.dark-theme .welcome-badge span {
+  color: var(--muted);
+}
+
+html.dark-theme .live-pill {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--ink-soft);
+}
+
+/* Guide Cards in Dark Mode */
+html.dark-theme .guide-card {
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+html.dark-theme .guide-card--skip.is-active {
+  background:
+    radial-gradient(circle at 95% 100%, rgba(52, 179, 130, 0.16), transparent 220px),
+    linear-gradient(145deg, #12281e, #0e1e17);
+  border-color: #24523b;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+html.dark-theme .guide-card--skip.is-active .guide-icon {
+  background: #173b2b;
+  color: var(--lime);
+  border: 1px solid rgba(210, 240, 68, 0.25);
+}
+
+html.dark-theme .guide-card--skip.is-active .guide-state {
+  background: rgba(52, 179, 130, 0.22);
+  color: #4ade80;
+  border: 1px solid rgba(52, 179, 130, 0.35);
+}
+
+html.dark-theme .guide-card--skip.is-active .guide-number strong {
+  color: #4ade80;
+  text-shadow: 0 0 20px rgba(74, 222, 128, 0.22);
+}
+
+html.dark-theme .guide-card--skip.is-active .guide-number span {
+  color: var(--muted);
+}
+
+html.dark-theme .guide-card--skip.is-active .guide-copy {
+  color: var(--ink-soft);
+}
+
+html.dark-theme .guide-card--skip.is-active .guide-foot {
+  border-top-color: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+}
+
+html.dark-theme .guide-card--skip.is-active .guide-foot b {
+  color: var(--ink);
+}
+
+html.dark-theme .guide-card--skip.is-active .formula-chip {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--lime);
+}
+
+html.dark-theme .guide-card--recover.is-active {
+  background:
+    radial-gradient(circle at 95% 100%, rgba(243, 131, 107, 0.16), transparent 220px),
+    linear-gradient(145deg, #2b1513, #1c0e0c);
+  border-color: #5c2c25;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+html.dark-theme .guide-card--recover.is-active .guide-icon {
+  background: #421c17;
+  color: var(--coral);
+  border: 1px solid rgba(243, 131, 107, 0.3);
+}
+
+html.dark-theme .guide-card--recover.is-active .guide-state {
+  background: rgba(243, 131, 107, 0.22);
+  color: var(--coral);
+  border: 1px solid rgba(243, 131, 107, 0.35);
+}
+
+html.dark-theme .guide-card--recover.is-active .guide-number strong {
+  color: var(--coral);
+  text-shadow: 0 0 20px rgba(243, 131, 107, 0.22);
+}
+
+html.dark-theme .guide-card--recover.is-active .guide-number span {
+  color: var(--muted);
+}
+
+html.dark-theme .guide-card--recover.is-active .guide-copy {
+  color: var(--ink-soft);
+}
+
+html.dark-theme .guide-card--recover.is-active .guide-foot {
+  border-top-color: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+}
+
+html.dark-theme .guide-card--recover.is-active .guide-foot b {
+  color: var(--ink);
+}
+
+html.dark-theme .guide-card.is-muted {
+  background: var(--surface);
+  border-color: var(--line);
+  box-shadow: none;
+}
+
+html.dark-theme .guide-card.is-muted .guide-icon {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+html.dark-theme .guide-card.is-muted .guide-state {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+}
+
+html.dark-theme .guide-card.is-muted .guide-number strong {
+  color: var(--muted);
+}
+
+html.dark-theme .guide-card.is-muted .guide-number span {
+  color: var(--muted-light);
+}
+
+html.dark-theme .guide-card.is-muted .guide-copy {
+  color: var(--muted);
+}
+
+html.dark-theme .guide-card.is-muted .guide-foot {
+  border-top-color: var(--line);
+  color: var(--muted-light);
+}
+
+html.dark-theme .guide-card.is-muted .guide-foot b {
+  color: var(--muted);
+}
+
+html.dark-theme .guide-card.is-muted .formula-chip {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+}
+
+/* Timetable & Class cards in Dark Mode */
+html.dark-theme .tt-cell--theory {
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+html.dark-theme .tt-cell--lab {
+  background: #142820;
+  border-color: #264a38;
+}
+
+html.dark-theme .tt-cell--program {
+  background: #272112;
+  border-color: #45391d;
+}
+
+html.dark-theme .tt-cell__code {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink);
+}
+
+html.dark-theme .today-class {
+  border-bottom-color: var(--line);
+}
+
+html.dark-theme .today-class:hover {
+  background: var(--surface-2);
+}
+
+html.dark-theme .subject-item {
+  border-bottom-color: var(--line);
+}
+
+html.dark-theme .subject-item:hover {
+  background: var(--surface-2);
+}
+
+html.dark-theme .activity-item {
+  border-bottom-color: var(--line);
+}
+
+html.dark-theme .activity-item:hover {
+  background: var(--surface-2);
+}
+
+/* Bunk Calculator in Dark Mode */
+html.dark-theme .calc-control-group {
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+
+html.dark-theme .stepper-input {
+  background: var(--surface);
+  border-color: var(--line-strong);
+}
+
+html.dark-theme .stepper-btn {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+html.dark-theme .stepper-btn:hover {
+  background: var(--green);
+  color: #06150f;
+}
+
+html.dark-theme .chip-action {
+  background: var(--surface-2);
+  border-color: var(--line);
+  color: var(--ink-soft);
+}
+
+html.dark-theme .chip-action:hover {
+  border-color: var(--green);
+  color: var(--lime);
+}
+
+html.dark-theme .bunk-calc-result {
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+
+html.dark-theme .calc-progress-track {
+  background: rgba(255, 255, 255, 0.08);
+}
+

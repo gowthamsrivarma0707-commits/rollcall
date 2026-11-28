@@ -504,3 +504,101 @@
     flex-wrap: wrap;
   }
 }
+
+/* =========================================================
+   Dark Theme Overrides for Auth / Login
+   ========================================================= */
+html.dark-theme .auth-role-tabs {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--line);
+}
+
+html.dark-theme .auth-role-tab {
+  color: var(--muted);
+}
+
+html.dark-theme .auth-role-tab:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+html.dark-theme .auth-role-tab.is-active {
+  background: var(--surface-2);
+  color: #ffffff;
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+html.dark-theme .auth-role-tab.is-active svg {
+  color: var(--lime);
+  opacity: 1;
+}
+
+html.dark-theme .role-badge {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+html.dark-theme .role-badge__dot {
+  background: var(--lime);
+  box-shadow: 0 0 0 3px rgba(210, 240, 68, 0.2);
+}
+
+html.dark-theme .login-form .input-shell input {
+  background: var(--surface-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+html.dark-theme .login-form .input-shell input:focus {
+  background: #172d23;
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(52, 179, 130, 0.25);
+}
+
+html.dark-theme .login-form .input-shell input::placeholder {
+  color: var(--muted-light);
+}
+
+html.dark-theme .input-shell__icon {
+  color: var(--muted);
+}
+
+html.dark-theme .input-action {
+  color: var(--muted);
+}
+
+html.dark-theme .input-action:hover {
+  color: var(--ink);
+}
+
+html.dark-theme input:-webkit-autofill,
+html.dark-theme input:-webkit-autofill:hover,
+html.dark-theme input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--ink) !important;
+  -webkit-box-shadow: 0 0 0px 1000px var(--surface-2) inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+html.dark-theme .login-submit {
+  background: var(--green);
+  color: #05140d;
+  font-weight: 750;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 18px rgba(52, 179, 130, 0.25);
+}
+
+html.dark-theme .login-submit:hover {
+  background: #3fd199;
+  color: #030e09;
+  box-shadow: 0 6px 24px rgba(52, 179, 130, 0.35);
+}
+
+html.dark-theme .auth-link {
+  color: var(--lime);
+}
+
+html.dark-theme .auth-switch a {
+  color: var(--lime);
+}

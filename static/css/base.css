@@ -109,13 +109,25 @@ html.dark-theme .theme-toggle .theme-icon-moon {
   display: none;
 }
 
-/* Dark mode overrides for dialogs and native inputs */
+/* Dark mode overrides for dialogs, buttons, and native inputs */
 html.dark-theme .modal-card,
 html.dark-theme [role="dialog"],
 html.dark-theme #modalForgotInfo > div {
   background: var(--surface) !important;
   color: var(--ink) !important;
   border: 1px solid var(--line);
+}
+html.dark-theme .btn--dark {
+  --btn-bg: var(--green);
+  --btn-fg: #06150f;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font-weight: 750;
+  box-shadow: 0 4px 16px rgba(52, 179, 130, 0.22);
+}
+html.dark-theme .btn--dark:hover {
+  --btn-bg: #3fd199;
+  --btn-fg: #020c07;
+  box-shadow: 0 6px 22px rgba(52, 179, 130, 0.35);
 }
 html.dark-theme input,
 html.dark-theme select,
