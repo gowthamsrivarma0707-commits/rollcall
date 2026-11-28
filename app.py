@@ -1580,8 +1580,8 @@ class RollCallHandler(BaseHTTPRequestHandler):
 
         # Students and teachers have sign-in rate limits to prevent brute-force attacks.
         # Administrators can log in anytime without lockout restrictions.
+        limiter_key = f"{role}|{username.lower()}"
         if role != "admin":
-            limiter_key = f"{role}|{username.lower()}"
             retry_after = limiter.retry_after(limiter_key)
             if retry_after:
                 raise ApiError(
@@ -1636,12 +1636,14 @@ class RollCallHandler(BaseHTTPRequestHandler):
         stored_hash = row["password_hash"] if row else DUMMY_PASSWORD_HASH
         valid = verify_password(password, stored_hash)
         if not row or not valid:
-            limiter.fail(limiter_key)
+            if role != "admin":
+                limiter.fail(limiter_key)
             login_ip_limiter.record(ip_key)
             log_security_event("failed_login", self._client_ip(), f"role={role} username={username}")
             raise ApiError(401, "Those details do not match an account.")
 
-        limiter.clear(limiter_key)
+        if role != "admin":
+            limiter.clear(limiter_key)
         self._delete_current_session(role)
         cookie = self._create_session_cookie(role, int(row["id"]))
         display = (
@@ -1922,9 +1924,6 @@ class RollCallHandler(BaseHTTPRequestHandler):
         role = str(payload.get("role", "")).strip().lower()
         if role not in {"student", "teacher", "admin"}:
             raise ApiError(400, "Choose a valid account type.")
-        if role == "admin":
-            log_security_event("admin_reset_blocked", self._client_ip(), "Blocked public self-service reset attempt on admin account")
-            raise ApiError(403, "Administrator credentials cannot be reset through public self-service. Contact your systems administrator or use the server CLI.")
 
         username = str(payload.get("username", "")).strip()
         if not username:
@@ -1998,15 +1997,17 @@ class RollCallHandler(BaseHTTPRequestHandler):
                     log_security_event("invalid_reset_token", self._client_ip(), f"token failed for {role}:{username}")
                     raise ApiError(403, "The password reset token is invalid or has expired. Please contact an administrator for a new token.")
                 conn.execute("UPDATE password_reset_tokens SET used = 1 WHERE token_hash = ?", (token_fp,))
-            elif is_first_time:
-                # First-time setup from initial default password (e.g. student123):
-                # Allowed directly without requiring admin token.
-                pass
             elif current_password:
                 if not verify_password(str(current_password), row["password_hash"]):
                     log_security_event("failed_reset_password_auth", self._client_ip(), f"{role}:{username}")
                     raise ApiError(401, "Current password is not correct.")
+            elif is_first_time:
+                # First-time setup from initial default password (e.g. student123):
+                # Allowed directly without requiring admin token.
+                pass
             else:
+                if role == "admin":
+                    raise ApiError(400, "Enter your current password to change the administrator password.")
                 # Second-time reset without token or current password: admin intervention required!
                 raise ApiError(
                     403,
