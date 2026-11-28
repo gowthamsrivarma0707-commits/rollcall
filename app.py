@@ -432,9 +432,13 @@ def init_db(reset: bool = False) -> None:
                 )
 
 
-def _all_teachers() -> list[sqlite3.Row]:
-    with get_db() as conn:
+def _all_teachers(conn: sqlite3.Connection | None = None) -> list[sqlite3.Row]:
+    if conn is not None:
         return conn.execute(
+            "SELECT id, name, employee_id FROM teachers ORDER BY name"
+        ).fetchall()
+    with get_db() as db_conn:
+        return db_conn.execute(
             "SELECT id, name, employee_id FROM teachers ORDER BY name"
         ).fetchall()
 
@@ -739,12 +743,20 @@ password_reset_limiter = RequestLimiter(max_requests=20, window_seconds=10 * 60)
 import_limiter = RequestLimiter(max_requests=10, window_seconds=10 * 60)
 
 
-def log_security_event(event_type: str, ip: str, detail: str = "") -> None:
+def log_security_event(
+    event_type: str,
+    ip: str,
+    detail: str = "",
+    conn: sqlite3.Connection | None = None,
+) -> None:
     now_iso = datetime.now().isoformat(timespec="seconds")
     sys.stderr.write(f"[SECURITY] [{now_iso}] [{ip}] {event_type}: {detail}\n")
     try:
-        with get_db() as conn:
+        if conn is not None:
             audit(conn, "security", None, event_type, f"ip={ip} {detail}")
+        else:
+            with get_db() as db_conn:
+                audit(db_conn, "security", None, event_type, f"ip={ip} {detail}")
     except Exception:
         pass
 
@@ -1759,7 +1771,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
                 (hash_password(new_password), user_id),
             )
             audit(conn, role, user_id, "first_password_set", "User set their private password on first login")
-            log_security_event("first_password_set_success", self._client_ip(), f"role={role} user_id={user_id}")
+            log_security_event("first_password_set_success", self._client_ip(), f"role={role} user_id={user_id}", conn=conn)
 
         self._send_json({"ok": True, "message": "Password updated successfully! Welcome to RollCall."})
 
@@ -2053,12 +2065,12 @@ class RollCallHandler(BaseHTTPRequestHandler):
                     (token_fp,),
                 ).fetchone()
                 if not t_row or t_row["used"] or t_row["expires_at"] < now_ts or t_row["role"] != role or int(t_row["user_id"]) != user_id:
-                    log_security_event("invalid_reset_token", self._client_ip(), f"token failed for {role}:{username}")
+                    log_security_event("invalid_reset_token", self._client_ip(), f"token failed for {role}:{username}", conn=conn)
                     raise ApiError(403, "The password reset token is invalid or has expired. Please contact an administrator for a new token.")
                 conn.execute("UPDATE password_reset_tokens SET used = 1 WHERE token_hash = ?", (token_fp,))
             elif current_password:
                 if not verify_password(str(current_password), row["password_hash"]):
-                    log_security_event("failed_reset_password_auth", self._client_ip(), f"{role}:{username}")
+                    log_security_event("failed_reset_password_auth", self._client_ip(), f"{role}:{username}", conn=conn)
                     raise ApiError(401, "Current password is not correct.")
             elif is_first_time:
                 # First-time setup from initial default password (e.g. student123):
@@ -2075,7 +2087,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
 
             self._update_password(conn, role, user_id, new_password)
             audit(conn, role, user_id, "password_reset")
-            log_security_event("password_reset_success", self._client_ip(), f"role={role} user_id={user_id} first_time={is_first_time}")
+            log_security_event("password_reset_success", self._client_ip(), f"role={role} user_id={user_id} first_time={is_first_time}", conn=conn)
 
             changed_note = ""
             if role == "teacher":
@@ -3522,7 +3534,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
         with get_db() as conn:
             faculty_list = [
                 {"id": int(row["id"]), "name": row["name"], "employee_id": row["employee_id"]}
-                for row in _all_teachers()
+                for row in _all_teachers(conn)
             ]
             rows = conn.execute(
                 """
