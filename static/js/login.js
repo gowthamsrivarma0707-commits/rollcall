@@ -294,6 +294,49 @@
   // Initialize role
   setRole(currentRole, false);
 
+  // Forgot password info popup for student/teacher
+  const forgotLink = document.getElementById("forgotPasswordLink");
+  const modalForgotInfo = document.getElementById("modalForgotInfo");
+  const forgotInfoBody = document.getElementById("forgotInfoBody");
+  const btnCloseForgotInfo = document.getElementById("btnCloseForgotInfo");
+
+  forgotLink?.addEventListener("click", (e) => {
+    if (currentRole === "student") {
+      e.preventDefault();
+      if (forgotInfoBody) {
+        forgotInfoBody.innerHTML = `
+          <p style="margin:0 0 10px;">Self-service password reset is disabled for student accounts.</p>
+          <p style="margin:0 0 12px;">Please contact your <strong>College Administrator</strong> or <strong>Department Office</strong> to reset your password.</p>
+          <div style="background:#f3f4f6; padding:12px; border-radius:8px; font-size:13px; color:#374151; line-height:1.5;">
+            📌 <strong>After Admin Reset:</strong><br>
+            Your temporary password will be your <strong>Register Number</strong>. You will be prompted to create your new password immediately upon sign-in.
+          </div>
+        `;
+      }
+      if (modalForgotInfo) modalForgotInfo.hidden = false;
+    } else if (currentRole === "teacher") {
+      e.preventDefault();
+      if (forgotInfoBody) {
+        forgotInfoBody.innerHTML = `
+          <p style="margin:0 0 10px;">Please contact the <strong>Administrator</strong> to reset your faculty account.</p>
+          <div style="background:#f3f4f6; padding:12px; border-radius:8px; font-size:13px; color:#374151; line-height:1.5;">
+            📌 <strong>After Reset:</strong><br>
+            Your temporary password will be <code>teacher123</code>.
+          </div>
+        `;
+      }
+      if (modalForgotInfo) modalForgotInfo.hidden = false;
+    }
+  });
+
+  btnCloseForgotInfo?.addEventListener("click", () => {
+    if (modalForgotInfo) modalForgotInfo.hidden = true;
+  });
+
+  modalForgotInfo?.addEventListener("click", (e) => {
+    if (e.target === modalForgotInfo) modalForgotInfo.hidden = true;
+  });
+
   // Register service worker on login page as well
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {

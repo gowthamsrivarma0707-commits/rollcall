@@ -156,25 +156,20 @@
         </article>
       </section>
 
-      <section class="card security-card" id="securityCard" hidden aria-label="Accounts still on default password">
-        <div class="card-head">
-          <div>
-            <p class="eyebrow">SECURITY</p>
-            <h2>Accounts still on default password</h2>
-          </div>
-          <span class="card-head__aside" id="securitySummary">—</span>
-        </div>
-        <p class="security-card__hint">Until every account changes, any student can open another account — just like today. Ask these students in class, or reset from office.</p>
-        <div class="security-card__lists">
-          <div>
-            <h3>Students <span id="securityStudentCount">0</span></h3>
-            <ul class="security-card__list" id="securityStudentList"></ul>
+      <!-- RESET STUDENT PASSWORD / FORGOT PASSWORD ACTION -->
+      <section class="card" style="padding: 16px 20px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%); border: 1px solid #bbf7d0; border-radius: 12px;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <div style="width: 40px; height: 40px; border-radius: 10px; background: #166534; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
           </div>
           <div>
-            <h3>Teachers <span id="securityTeacherCount">0</span></h3>
-            <ul class="security-card__list" id="securityTeacherList"></ul>
+            <h3 style="margin: 0; font-size: 15px; font-weight: 600; color: #166534;">Student / Faculty Password Reset</h3>
+            <p style="margin: 2px 0 0; font-size: 13px; color: #4b5563;">Reset forgotten passwords for students back to their Register Number, or faculty to default.</p>
           </div>
         </div>
+        <button class="btn btn--dark btn--small" id="openOverviewResetPasswordModal" type="button" style="white-space: nowrap; padding: 8px 16px; font-weight: 600; border-radius: 8px;">
+          🔑 Reset Password
+        </button>
       </section>
 
       <div class="teacher-columns">
@@ -819,33 +814,30 @@
     <div class="modal-backdrop" id="modalResetPassword" hidden>
       <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalResetPasswordTitle">
         <div class="modal-head">
-          <h3 id="modalResetPasswordTitle">Reset User Password</h3>
+          <h3 id="modalResetPasswordTitle">Reset Forgotten Password</h3>
           <button class="modal-close" type="button" data-close-modal aria-label="Close modal">✕</button>
         </div>
         <form id="formResetUserPassword" class="modal-body">
           <p class="field-hint" style="margin-top:0;">
-            Use this when a student or teacher forgot their custom password. This resets their account to default (<code>student123</code> / <code>teacher123</code>) so they can set a new password on first login.
+            Use this when a student or teacher forgot their custom password.
+            Resetting a student account sets their password to their <strong>Register Number</strong> (e.g. <code>26PSMCA0001</code>). They will be prompted to set a new password on their next sign-in.
           </p>
           <div class="form-field">
             <label for="resetUserRole">Account Type</label>
             <select id="resetUserRole" required>
-              <option value="student">Student</option>
+              <option value="student" selected>Student</option>
               <option value="teacher">Teacher / Faculty</option>
             </select>
           </div>
           <div class="form-field">
-            <label for="resetUserIdentifier">Register No or Employee ID *</label>
-            <input id="resetUserIdentifier" type="text" placeholder="e.g. 26PSMCA0001 or EMP-01" required>
+            <label for="resetUserIdentifier" id="resetUserIdentifierLabel">Student Register Number *</label>
+            <input id="resetUserIdentifier" type="text" placeholder="e.g. 26PSMCA0001" required autocomplete="off">
+            <small class="field-hint" id="resetHintText">Student's reset password will be: <strong>Register Number</strong></small>
           </div>
-          <div class="form-field">
-            <label for="resetCustomPassword">New Temporary Password (Optional)</label>
-            <input id="resetCustomPassword" type="text" placeholder="Leave blank for default (student123 / teacher123)">
-            <small class="field-hint">User will be prompted to set their own password immediately upon login.</small>
-          </div>
-          <div id="resetUserSuccessBox" class="alert alert--success" hidden style="margin-top:10px; padding:10px; font-size:13px; border-radius:6px; background:#e6f4ea; color:#137333;"></div>
+          <div id="resetUserSuccessBox" class="alert alert--success" hidden style="margin-top:12px; padding:12px; font-size:13px; border-radius:8px; background:#e6f4ea; color:#137333; line-height:1.5;"></div>
           <div class="modal-foot">
             <button class="btn btn--ghost" type="button" data-close-modal>Cancel</button>
-            <button class="btn btn--dark" id="btnSubmitResetPassword" type="submit">Reset Password</button>
+            <button class="btn btn--dark" id="btnSubmitResetPassword" type="submit">Reset to Register Number</button>
           </div>
         </form>
       </div>

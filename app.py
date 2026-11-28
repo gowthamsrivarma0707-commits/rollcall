@@ -1486,6 +1486,9 @@ class RollCallHandler(BaseHTTPRequestHandler):
         if path == "/api/password/change":
             self._change_password()
             return
+        if path == "/api/first-login/change-password":
+            self._first_login_change_password()
+            return
         if path == "/api/password/reset":
             self._reset_password()
             return
@@ -1687,7 +1690,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
         if role == "student":
             return conn.execute(
                 """
-                SELECT id, password_hash, must_change_password FROM students
+                SELECT id, register_no, password_hash, must_change_password FROM students
                 WHERE register_no = ? COLLATE NOCASE AND active = 1
                 """,
                 (username,),
@@ -1695,17 +1698,42 @@ class RollCallHandler(BaseHTTPRequestHandler):
         if role == "teacher":
             return conn.execute(
                 """
-                SELECT id, password_hash, must_change_password FROM teachers
+                SELECT id, employee_id, email, password_hash, must_change_password FROM teachers
                 WHERE email = ? COLLATE NOCASE OR employee_id = ? COLLATE NOCASE
                 """,
                 (username, username),
             ).fetchone()
         if role == "admin":
             return conn.execute(
-                "SELECT id, password_hash, must_change_password FROM admins WHERE username = ? COLLATE NOCASE",
+                "SELECT id, username, password_hash, must_change_password FROM admins WHERE username = ? COLLATE NOCASE",
                 (username,),
             ).fetchone()
         return None
+
+    def _first_login_change_password(self) -> None:
+        session = self._require_api_session()
+        payload = self._read_json()
+        role = session["role"]
+        user_id = int(session["user_id"])
+
+        new_password = validate_new_password(payload.get("new_password"))
+        confirm_password = payload.get("confirm_password")
+        if new_password != str(confirm_password or ""):
+            raise ApiError(400, "The new password and confirmation do not match.")
+
+        with get_db() as conn:
+            table = {"student": "students", "teacher": "teachers", "admin": "admins"}.get(role)
+            if not table:
+                raise ApiError(400, "Invalid role.")
+            
+            conn.execute(
+                f"UPDATE {table} SET password_hash = ?, must_change_password = 0 WHERE id = ?",
+                (hash_password(new_password), user_id),
+            )
+            audit(conn, role, user_id, "first_password_set", "User set their private password on first login")
+            log_security_event("first_password_set_success", self._client_ip(), f"role={role} user_id={user_id}")
+
+        self._send_json({"ok": True, "message": "Password updated successfully! Welcome to RollCall."})
 
     def _update_password(
         self, conn: sqlite3.Connection, role: str, user_id: int, new_password: str
@@ -1895,16 +1923,19 @@ class RollCallHandler(BaseHTTPRequestHandler):
         if not username:
             raise ApiError(400, "Username, register number or employee ID is required.")
 
-        default_pw = "student123" if target_role == "student" else "teacher123"
-        new_pw = str(payload.get("new_password", "")).strip() or default_pw
-
         with get_db() as conn:
             user = self._lookup_account(conn, target_role, username)
             if not user:
                 raise ApiError(404, f"No {target_role} found with username/ID '{username}'.")
             user_id = int(user["id"])
             table = "students" if target_role == "student" else "teachers"
-            # Reset password to default and mark must_change_password = 1 so the user can set a new password on first login
+
+            # Students default password is their uppercase Register Number (like college LMS).
+            # Teachers default password is teacher123.
+            default_pw = str(user["register_no"]).strip().upper() if target_role == "student" else "teacher123"
+            new_pw = str(payload.get("new_password", "")).strip() or default_pw
+
+            # Reset password to default and mark must_change_password = 1 so the user is prompted on login
             conn.execute(
                 f"UPDATE {table} SET password_hash = ?, must_change_password = 1 WHERE id = ?",
                 (hash_password(new_pw), user_id),
@@ -1915,7 +1946,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
 
         self._send_json({
             "ok": True,
-            "message": f"Successfully reset {target_role} '{username}' to initial password ({new_pw}). They can now set their password again on first sign-in.",
+            "message": f"Successfully reset {target_role} '{username}' password to {new_pw}. They can now sign in and set a new password.",
             "temporary_password": new_pw,
         })
 
@@ -2121,7 +2152,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
         with get_db() as conn:
             student = conn.execute(
                 """
-                SELECT s.id, s.name, s.register_no, s.class_id,
+                SELECT s.id, s.name, s.register_no, s.class_id, s.must_change_password,
                        c.name AS class_name, c.code AS class_code,
                        c.semester
                 FROM students s
@@ -2231,6 +2262,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
                 "class_name": student["class_name"],
                 "class_code": student["class_code"],
                 "semester": student["semester"],
+                "must_change_password": bool(student["must_change_password"]),
             },
             "overall": overall,
             "subjects": subjects,
@@ -2262,7 +2294,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
         with get_db() as conn:
             if admin:
                 row = conn.execute(
-                    "SELECT id, username, name, email, dob, qualification, photo_base64, bio FROM admins WHERE id = ?",
+                    "SELECT id, username, name, email, dob, qualification, photo_base64, bio, must_change_password FROM admins WHERE id = ?",
                     (teacher_id,),
                 ).fetchone()
                 if not row:
@@ -2277,6 +2309,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
                     "qualification": row["qualification"] or "",
                     "photo_base64": row["photo_base64"] or "",
                     "bio": row["bio"] or "",
+                    "must_change_password": bool(row["must_change_password"]),
                 }
                 rows = conn.execute(
                     """
@@ -2295,7 +2328,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
                 teacher_row = conn.execute(
                     """
                     SELECT id, name, employee_id, email, department,
-                           dob, qualification, photo_base64, bio
+                           dob, qualification, photo_base64, bio, must_change_password
                     FROM teachers WHERE id = ?
                     """,
                     (teacher_id,),
@@ -2312,6 +2345,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
                     "qualification": teacher_row["qualification"] or "",
                     "photo_base64": teacher_row["photo_base64"] or "",
                     "bio": teacher_row["bio"] or "",
+                    "must_change_password": bool(teacher_row["must_change_password"]),
                 }
                 rows = conn.execute(
                     """
@@ -3178,7 +3212,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
         register_no = str(payload.get("register_no", "")).strip().upper()
         class_id = parse_integer(payload.get("class_id"), "Choose a valid class / section.")
         email = str(payload.get("email", "")).strip().lower() or None
-        password = str(payload.get("password", "")).strip() or "student123"
+        password = str(payload.get("password", "")).strip() or register_no
 
         if not name:
             raise ApiError(400, "Student name is required.")
@@ -3372,7 +3406,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
                         INSERT INTO students (register_no, name, email, password_hash, class_id, active, must_change_password)
                         VALUES (?, ?, ?, ?, ?, 1, 1)
                         """,
-                        (reg_no, name, email, hash_password("student123"), target_class_id),
+                        (reg_no, name, email, hash_password(reg_no), target_class_id),
                     )
                 imported_count += 1
                 by_class_summary[target_code] += 1

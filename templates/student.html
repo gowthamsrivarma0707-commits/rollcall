@@ -240,6 +240,34 @@
     </footer>
   </main>
 
+  <!-- MODAL: MANDATORY FIRST-TIME PASSWORD SETUP -->
+  <div class="modal-backdrop" id="modalFirstLoginPassword" hidden style="position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.75); display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
+    <div class="modal-card" role="dialog" aria-modal="true" style="background:#fff; border-radius:14px; max-width:440px; width:90%; padding:24px; box-shadow:0 20px 50px rgba(0,0,0,0.35);">
+      <div style="border-bottom:1px solid #e5e7eb; padding-bottom:14px; margin-bottom:16px;">
+        <span style="display:inline-block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#166534; background:#dcfce7; padding:3px 10px; border-radius:99px; margin-bottom:8px;">Account Setup Required</span>
+        <h3 style="margin:0; font-size:19px; font-weight:700; color:#111827;">Set Your New Password</h3>
+      </div>
+      <form id="formFirstLoginPassword">
+        <p style="margin:0 0 14px; font-size:13.5px; color:#4b5563; line-height:1.5;">
+          Welcome to RollCall! Your initial default password was your <strong>Register Number</strong>.
+          For security, please choose your private password now. This will be your permanent password.
+        </p>
+        <div class="form-field" style="margin-bottom:14px;">
+          <label for="firstNewPassword" style="display:block; font-weight:600; font-size:13px; margin-bottom:6px; color:#374151;">New Password (at least 8 characters) *</label>
+          <input id="firstNewPassword" type="password" placeholder="Enter new password" required minlength="8" autocomplete="new-password" style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; box-sizing:border-box;">
+        </div>
+        <div class="form-field" style="margin-bottom:14px;">
+          <label for="firstConfirmPassword" style="display:block; font-weight:600; font-size:13px; margin-bottom:6px; color:#374151;">Confirm New Password *</label>
+          <input id="firstConfirmPassword" type="password" placeholder="Re-enter new password" required minlength="8" autocomplete="new-password" style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; box-sizing:border-box;">
+        </div>
+        <div id="firstLoginError" class="alert alert--error" hidden style="margin-bottom:14px; padding:10px 12px; font-size:13px; border-radius:6px; background:#fee2e2; color:#991b1b; line-height:1.4;"></div>
+        <div style="margin-top:20px;">
+          <button class="btn btn--dark" id="btnSubmitFirstLoginPassword" type="submit" style="width:100%; padding:11px 16px; font-weight:600; font-size:14px; border-radius:8px;">Save Password & Continue →</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="/static/js/common.js"></script>
   <script src="/static/js/student.js"></script>
 </body>

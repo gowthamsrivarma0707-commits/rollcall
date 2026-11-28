@@ -398,6 +398,7 @@
 
     const hero = $("studentHero");
     hero.dataset.state = overall.status;
+    checkFirstLoginPassword(student);
     setRing(overall.percentage);
     setRingPercent(overall.percentage);
 
@@ -478,6 +479,60 @@
   state.pollTimer = window.setInterval(() => {
     if (!document.hidden) load({ silent: true });
   }, 15000);
+
+  function checkFirstLoginPassword(student) {
+    const modal = $("modalFirstLoginPassword");
+    if (student?.must_change_password && modal) {
+      modal.hidden = false;
+    }
+  }
+
+  const formFirstLogin = $("formFirstLoginPassword");
+  const firstError = $("firstLoginError");
+  const btnFirstSubmit = $("btnSubmitFirstLoginPassword");
+
+  formFirstLogin?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (firstError) firstError.hidden = true;
+    const p1 = $("firstNewPassword")?.value || "";
+    const p2 = $("firstConfirmPassword")?.value || "";
+    if (p1.length < 8) {
+      if (firstError) {
+        firstError.hidden = false;
+        firstError.textContent = "Password must be at least 8 characters long.";
+      }
+      return;
+    }
+    if (p1 !== p2) {
+      if (firstError) {
+        firstError.hidden = false;
+        firstError.textContent = "Passwords do not match.";
+      }
+      return;
+    }
+    setButtonLoading(btnFirstSubmit, true);
+    try {
+      const res = await api.post("/api/first-login/change-password", {
+        new_password: p1,
+        confirm_password: p2,
+      });
+      const modal = $("modalFirstLoginPassword");
+      if (modal) modal.hidden = true;
+      if (window.RollCall?.toast) {
+        window.RollCall.toast(res.message || "Password updated successfully!");
+      } else {
+        alert(res.message || "Password updated successfully!");
+      }
+      load({ silent: true });
+    } catch (err) {
+      if (firstError) {
+        firstError.hidden = false;
+        firstError.textContent = err.message || "Failed to update password.";
+      }
+    } finally {
+      setButtonLoading(btnFirstSubmit, false);
+    }
+  });
 
   load();
 })();

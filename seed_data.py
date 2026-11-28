@@ -327,7 +327,7 @@ def seed_database(conn: sqlite3.Connection) -> None:
                 register_no,
                 name,
                 f"{register_no.lower()}@student.rollcall.local",
-                hash_password(STUDENT_PASSWORD),
+                hash_password(register_no),
                 class_ids[class_code],
             ),
         )

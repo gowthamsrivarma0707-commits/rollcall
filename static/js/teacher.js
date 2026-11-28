@@ -374,6 +374,7 @@ const state = {
       applyHolidayFlags();
       renderOverview(data);
       if (data.admin_view) loadSecurityCard();
+      checkFirstLoginPasswordTeacher(data.teacher, data.admin_view);
       if (!state.initialized) {
         initializeMarkControls();
         initializeRecordFilters();
@@ -1659,6 +1660,24 @@ const state = {
       $("resetUserIdentifier")?.focus();
     });
 
+    $("openOverviewResetPasswordModal")?.addEventListener("click", () => {
+      $("modalResetPassword").hidden = false;
+      $("resetUserIdentifier")?.focus();
+    });
+
+    $("resetUserRole")?.addEventListener("change", (e) => {
+      const role = e.target.value;
+      const isStudent = role === "student";
+      const lbl = $("resetUserIdentifierLabel");
+      const inp = $("resetUserIdentifier");
+      const hint = $("resetHintText");
+      const btn = $("btnSubmitResetPassword");
+      if (lbl) lbl.textContent = isStudent ? "Student Register Number *" : "Teacher Employee ID or Email *";
+      if (inp) inp.placeholder = isStudent ? "e.g. 26PSMCA0001" : "e.g. PRP or prp@gvpihlr.edu.in";
+      if (hint) hint.innerHTML = isStudent ? "Student's reset password will be: <strong>Register Number</strong>" : "Teacher's reset password will be: <strong>teacher123</strong>";
+      if (btn) btn.textContent = isStudent ? "Reset to Register Number" : "Reset to teacher123";
+    });
+
     document.querySelectorAll("[data-close-modal]").forEach((btn) => {
       btn.addEventListener("click", () => {
         document.querySelectorAll(".modal-backdrop").forEach((m) => (m.hidden = true));
@@ -2813,6 +2832,54 @@ const state = {
       });
     });
   }
+
+  function checkFirstLoginPasswordTeacher(teacher, isAdminView) {
+    const modal = $("modalFirstLoginPassword");
+    if (teacher?.must_change_password && !isAdminView && modal) {
+      modal.hidden = false;
+    }
+  }
+
+  $("formFirstLoginPassword")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const firstError = $("firstLoginError");
+    if (firstError) firstError.hidden = true;
+    const p1 = $("firstNewPassword")?.value || "";
+    const p2 = $("firstConfirmPassword")?.value || "";
+    if (p1.length < 8) {
+      if (firstError) {
+        firstError.hidden = false;
+        firstError.textContent = "Password must be at least 8 characters long.";
+      }
+      return;
+    }
+    if (p1 !== p2) {
+      if (firstError) {
+        firstError.hidden = false;
+        firstError.textContent = "Passwords do not match.";
+      }
+      return;
+    }
+    const btnFirstSubmit = $("btnSubmitFirstLoginPassword");
+    setButtonLoading(btnFirstSubmit, true);
+    try {
+      const res = await api.post("/api/first-login/change-password", {
+        new_password: p1,
+        confirm_password: p2,
+      });
+      const modal = $("modalFirstLoginPassword");
+      if (modal) modal.hidden = true;
+      toast(res.message || "Password updated successfully!");
+      loadDashboard({ silent: true });
+    } catch (err) {
+      if (firstError) {
+        firstError.hidden = false;
+        firstError.textContent = err.message || "Failed to update password.";
+      }
+    } finally {
+      setButtonLoading(btnFirstSubmit, false);
+    }
+  });
 
   /* ---------------------------------------------------------
      Start
