@@ -342,8 +342,23 @@
     }
   });
 
+  const btnXCloseForgotInfo = document.getElementById("btnXCloseForgotInfo");
+  btnXCloseForgotInfo?.addEventListener("click", () => {
+    if (modalForgotInfo) {
+      modalForgotInfo.style.display = "none";
+      modalForgotInfo.hidden = true;
+    }
+  });
+
   modalForgotInfo?.addEventListener("click", (e) => {
     if (e.target === modalForgotInfo) {
+      modalForgotInfo.style.display = "none";
+      modalForgotInfo.hidden = true;
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && modalForgotInfo && modalForgotInfo.style.display !== "none") {
       modalForgotInfo.style.display = "none";
       modalForgotInfo.hidden = true;
     }
