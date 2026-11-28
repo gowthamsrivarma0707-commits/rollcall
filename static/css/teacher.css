@@ -2724,14 +2724,16 @@
 
 .students-export input[type="month"] {
   min-height: 38px;
-  padding: 0 38px 0 12px;
+  padding: 0 12px;
   border: 1px solid var(--line-strong);
   border-radius: 10px;
   font-size: 13.5px;
   font-weight: 700;
-  background-color: var(--surface);
-  color: var(--ink);
+  background-color: var(--surface) !important;
+  color: var(--ink) !important;
   color-scheme: light;
+  background-image: none !important;
+  background-repeat: no-repeat !important;
 }
 
 @media (max-width: 720px) {
@@ -3305,10 +3307,12 @@ html.dark-theme .students-export__text span {
 }
 
 html.dark-theme .students-export input[type="month"] {
-  background-color: var(--surface-2);
-  color: var(--ink);
+  background-color: var(--surface-2) !important;
+  color: var(--ink) !important;
   border-color: var(--line-strong);
-  color-scheme: dark;
+  color-scheme: dark !important;
+  background-image: none !important;
+  background-repeat: no-repeat !important;
 }
 
 html.dark-theme .elective-card,

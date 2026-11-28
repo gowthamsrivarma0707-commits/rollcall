@@ -1245,22 +1245,18 @@ html.dark-theme .btn--outline:hover {
   }
 }
 
-/* Date pickers: hide the faint native glyph and draw a clear icon ourselves.
-   The native indicator stays in place (opacity 0) so clicking still opens
-   the browser's date picker, just like clicking the drawn icon. */
+/* Date and month pickers: use clean native calendar indicator with proper color-scheme */
 input[type="date"],
 input[type="month"] {
   min-height: 38px;
-  padding: 0 38px 0 12px;
+  padding: 0 12px;
   border: 1px solid var(--line-strong);
   border-radius: 10px;
-  background-color: var(--surface);
-  color: var(--ink);
+  background-color: var(--surface) !important;
+  color: var(--ink) !important;
   color-scheme: light;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none'%3E%3Crect x='3' y='5' width='18' height='16' rx='2.5' stroke='%231d6a4c' stroke-width='1.7'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4' stroke='%231d6a4c' stroke-width='1.7' stroke-linecap='round'/%3E%3Crect x='7' y='13' width='2.5' height='2.5' rx='0.5' fill='%231d6a4c'/%3E%3Crect x='11.5' y='13' width='2.5' height='2.5' rx='0.5' fill='%231d6a4c'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  background-size: 18px;
+  background-image: none !important;
+  background-repeat: no-repeat !important;
   font-family: inherit;
   font-size: 13.5px;
   font-weight: 650;
@@ -1269,19 +1265,26 @@ input[type="month"] {
 
 html.dark-theme input[type="date"],
 html.dark-theme input[type="month"] {
-  background-color: var(--surface-2);
-  color: var(--ink);
+  background-color: var(--surface-2) !important;
+  color: var(--ink) !important;
   border-color: var(--line-strong);
-  color-scheme: dark;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none'%3E%3Crect x='3' y='5' width='18' height='16' rx='2.5' stroke='%2334b382' stroke-width='1.7'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4' stroke='%2334b382' stroke-width='1.7' stroke-linecap='round'/%3E%3Crect x='7' y='13' width='2.5' height='2.5' rx='0.5' fill='%2334b382'/%3E%3Crect x='11.5' y='13' width='2.5' height='2.5' rx='0.5' fill='%2334b382'/%3E%3C/svg%3E");
+  color-scheme: dark !important;
+  background-image: none !important;
+  background-repeat: no-repeat !important;
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="month"]::-webkit-calendar-picker-indicator {
-  opacity: 0;
+  opacity: 0.85;
   cursor: pointer;
-  margin-right: -30px;
-  padding: 10px;
+  margin: 0;
+  padding: 2px;
+  transition: opacity 160ms var(--ease);
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="month"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
 }
 
 /* First-login rotation reminder + admin security card */
