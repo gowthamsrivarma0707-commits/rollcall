@@ -36,6 +36,10 @@
         <span class="live-pill live-pill--header" id="livePill" title="Refreshes automatically">
           <span></span> Live
         </span>
+        <button class="icon-button theme-toggle" id="themeToggleBtn" type="button" aria-label="Toggle theme" title="Toggle dark mode">
+          <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
         <button class="icon-button" id="refreshButton" type="button" aria-label="Refresh attendance" title="Refresh attendance">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
@@ -180,6 +184,71 @@
       <span class="guidance-note__mark">i</span>
       Attendance is weighted by period: labs count as two periods and the CTV interactive program counts as three. Holiday periods are not counted, and 75% remains the college requirement.
     </p>
+
+    <!-- INTERACTIVE 75% BUNK & ATTENDANCE SIMULATOR -->
+    <section class="card bunk-calc-card" id="bunkCalculatorCard">
+      <div class="card-head">
+        <div>
+          <p class="eyebrow">ATTENDANCE SIMULATOR</p>
+          <h2>75% Target & Bunk Planner</h2>
+        </div>
+        <span class="formula-chip" id="calcLiveBadge">Interactive</span>
+      </div>
+
+      <div class="bunk-calc-grid">
+        <div class="bunk-calc-controls">
+          <div class="calc-control-group">
+            <label for="calcMissCount">
+              <span class="calc-label-title">What if I miss classes?</span>
+              <span class="calc-label-sub">Upcoming periods you plan to skip</span>
+            </label>
+            <div class="stepper-input">
+              <button type="button" class="stepper-btn" id="btnMinusMiss" aria-label="Decrease missed classes">−</button>
+              <input type="number" id="calcMissCount" min="0" max="100" value="0" class="stepper-val">
+              <button type="button" class="stepper-btn" id="btnPlusMiss" aria-label="Increase missed classes">+</button>
+            </div>
+          </div>
+
+          <div class="calc-control-group">
+            <label for="calcAttendCount">
+              <span class="calc-label-title">What if I attend extra classes?</span>
+              <span class="calc-label-sub">Upcoming periods you attend without miss</span>
+            </label>
+            <div class="stepper-input">
+              <button type="button" class="stepper-btn" id="btnMinusAttend" aria-label="Decrease attended classes">−</button>
+              <input type="number" id="calcAttendCount" min="0" max="100" value="0" class="stepper-val">
+              <button type="button" class="stepper-btn" id="btnPlusAttend" aria-label="Increase attended classes">+</button>
+            </div>
+          </div>
+
+          <div class="calc-quick-chips">
+            <span class="quick-chips-label">Quick test:</span>
+            <button type="button" class="chip-action" id="chipMissTomorrow">+ Miss 4 (Tomorrow)</button>
+            <button type="button" class="chip-action" id="chipAttendWeek">+ Attend 30 (1 Week)</button>
+            <button type="button" class="chip-action chip-action--reset" id="chipResetCalc">Reset</button>
+          </div>
+        </div>
+
+        <div class="bunk-calc-result" id="calcResultBox">
+          <div class="calc-result-header">
+            <span class="calc-result-tag" id="calcStatusTag">75% ELIGIBLE</span>
+            <span class="calc-diff-text" id="calcDiffText">Current baseline</span>
+          </div>
+
+          <div class="calc-percent-display">
+            <div class="calc-percent-val" id="calcPercentVal">--%</div>
+            <div class="calc-percent-sub" id="calcFractionVal">0 / 0 periods</div>
+          </div>
+
+          <div class="calc-progress-track">
+            <div class="calc-progress-fill" id="calcProgressFill" style="width: 0%;"></div>
+            <div class="calc-progress-marker" title="75% minimum threshold" style="left: 75%;"></div>
+          </div>
+
+          <p class="calc-verdict" id="calcVerdictText">Loading your live attendance to simulate bunk scenarios...</p>
+        </div>
+      </div>
+    </section>
 
     <section class="card timetable-card">
       <div class="card-head">

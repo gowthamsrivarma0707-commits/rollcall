@@ -1456,6 +1456,33 @@ class RollCallHandler(BaseHTTPRequestHandler):
             )
             return
 
+        if path == "/api/teacher/students/export/pdf":
+            session, is_admin = self._require_staff_session()
+            retry = export_limiter.hit(
+                f"export_pdf|{self._client_ip()}|{session['user_id']}"
+            )
+            if retry:
+                raise ApiError(
+                    429,
+                    "Too many exports. Please wait before downloading again.",
+                    retry_after=retry,
+                )
+            body, filename = self._teacher_students_export_pdf(
+                session["user_id"], query, admin=is_admin
+            )
+            self._send_bytes(
+                body,
+                "application/pdf",
+                extra_headers=[
+                    (
+                        "Content-Disposition",
+                        f'attachment; filename="{filename}"',
+                    )
+                ],
+                head_only=head_only,
+            )
+            return
+
         raise ApiError(404, "API endpoint not found.")
 
     # ------------------------------------------------------------------ POST
@@ -4690,6 +4717,336 @@ class RollCallHandler(BaseHTTPRequestHandler):
             pass
         buffer = io.BytesIO()
         wb.save(buffer)
+        return buffer.getvalue(), filename
+
+    def _teacher_students_export_pdf(
+        self, teacher_id: int, query: dict, *, admin: bool = False
+    ) -> tuple[bytes, str]:
+        try:
+            import io
+            from reportlab.lib.pagesizes import A4, landscape
+            from reportlab.lib import colors
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.platypus import (
+                SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, KeepTogether
+            )
+            from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+        except Exception as exc:
+            raise ApiError(
+                501, "PDF export is not available on this server (reportlab missing)."
+            ) from exc
+
+        raw_month = (query.get("month", [""])[0] or "").strip()
+        today = date.today()
+        year, month = today.year, today.month
+        if raw_month:
+            try:
+                year_text, month_text = raw_month.split("-", 1)
+                year, month = int(year_text), int(month_text)
+                if not (2000 <= year <= 2099 and 1 <= month <= 12):
+                    raise ValueError
+            except (ValueError, AttributeError):
+                raise ApiError(400, "Choose the month as YYYY-MM.") from None
+        if (year, month) > (today.year, today.month):
+            raise ApiError(400, "Choose a month that has already started.")
+        month_start = date(year, month, 1)
+        if month == 12:
+            month_end = date(year + 1, 1, 1)
+        else:
+            month_end = date(year, month + 1, 1)
+        month_label = month_start.strftime("%B %Y")
+
+        with get_db() as conn:
+            if admin:
+                class_rows = conn.execute(
+                    "SELECT id, code, name, semester FROM classes ORDER BY id"
+                ).fetchall()
+            else:
+                class_rows = conn.execute(
+                    """
+                    SELECT DISTINCT c.id, c.code, c.name, c.semester
+                    FROM classes c
+                    JOIN teacher_assignments ta ON ta.class_id = c.id
+                    WHERE ta.teacher_id = ?
+                    ORDER BY c.id
+                    """,
+                    (teacher_id,),
+                ).fetchall()
+            allowed = {int(row["id"]): row for row in class_rows}
+            if not allowed:
+                raise ApiError(404, "No class is available for export.")
+
+            raw_class = (query.get("class_id", [""])[0] or "").strip()
+            is_all_classes = (raw_class.lower() in ("all", "0", "both")) if raw_class else False
+            if is_all_classes:
+                target_classes = [dict(allowed[cid]) for cid in allowed]
+                filename = f"RollCall_Consolidated_{year}-{month:02d}_Attendance.pdf"
+            else:
+                if raw_class:
+                    class_id = parse_integer(raw_class, "Invalid class.")
+                    if class_id <= 0 or class_id not in allowed:
+                        raise ApiError(403, "You cannot export this class.")
+                else:
+                    class_id = next(iter(allowed))
+                target_classes = [dict(allowed[class_id])]
+                filename = f"RollCall_{target_classes[0]['code']}_{year}-{month:02d}_Attendance.pdf"
+
+            class_data_list = []
+            for class_row in target_classes:
+                cid = int(class_row["id"])
+                session_rows = conn.execute(
+                    """
+                    SELECT ses.id, ses.subject_id, ses.period, ses.span
+                    FROM attendance_sessions ses
+                    WHERE ses.class_id = ? AND ses.is_holiday = 0
+                      AND ses.attendance_date >= ? AND ses.attendance_date < ?
+                    """,
+                    (cid, month_start.isoformat(), month_end.isoformat()),
+                ).fetchall()
+                session_ids = [int(row["id"]) for row in session_rows]
+                session_spans = {int(row["id"]): int(row["span"]) for row in session_rows}
+
+                record_rows = []
+                if session_ids:
+                    placeholders = ",".join("?" for _ in session_ids)
+                    record_rows = conn.execute(
+                        f"""
+                        SELECT session_id, student_id, status
+                        FROM attendance_records
+                        WHERE session_id IN ({placeholders})
+                        """,
+                        session_ids,
+                    ).fetchall()
+
+                student_rows = conn.execute(
+                    """
+                    SELECT id, register_no, name
+                    FROM students
+                    WHERE class_id = ? AND active = 1
+                    ORDER BY register_no
+                    """,
+                    (cid,),
+                ).fetchall()
+
+                total_held = sum(session_spans.values())
+                student_attended = {int(s["id"]): 0 for s in student_rows}
+                for rec in record_rows:
+                    if rec["status"] == "present":
+                        span = session_spans.get(int(rec["session_id"]), 1)
+                        student_attended[int(rec["student_id"])] = (
+                            student_attended.get(int(rec["student_id"]), 0) + span
+                        )
+
+                students = []
+                for s in student_rows:
+                    sid = int(s["id"])
+                    att = student_attended.get(sid, 0)
+                    pct = round((att / total_held * 100), 1) if total_held > 0 else 100.0
+                    if pct >= 75.0:
+                        status = "ELIGIBLE"
+                    elif pct >= 65.0:
+                        status = "CONDONATION"
+                    else:
+                        status = "DETAINED"
+                    students.append({
+                        "register_no": s["register_no"],
+                        "name": s["name"],
+                        "attended": att,
+                        "held": total_held,
+                        "pct": pct,
+                        "status": status,
+                    })
+
+                class_data_list.append({
+                    "class_row": class_row,
+                    "total_held": total_held,
+                    "students": students,
+                })
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=landscape(A4),
+            leftMargin=24,
+            rightMargin=24,
+            topMargin=20,
+            bottomMargin=20,
+        )
+
+        styles = getSampleStyleSheet()
+        style_title = ParagraphStyle(
+            "CollegeTitle",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=13,
+            leading=15,
+            alignment=TA_CENTER,
+            textColor=colors.HexColor("#0D2F24"),
+        )
+        style_inst = ParagraphStyle(
+            "InstTitle",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=10,
+            leading=12,
+            alignment=TA_CENTER,
+            textColor=colors.HexColor("#1D6A4C"),
+        )
+        style_sub = ParagraphStyle(
+            "SubTitle",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=8.5,
+            leading=11,
+            alignment=TA_CENTER,
+            textColor=colors.HexColor("#4B5563"),
+        )
+        style_meta = ParagraphStyle(
+            "MetaBar",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=8.5,
+            leading=11,
+            alignment=TA_CENTER,
+            textColor=colors.HexColor("#1F2937"),
+        )
+        style_th = ParagraphStyle(
+            "TH",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=8,
+            leading=10,
+            alignment=TA_CENTER,
+            textColor=colors.white,
+        )
+        style_td_c = ParagraphStyle(
+            "TDC",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=8,
+            leading=10,
+            alignment=TA_CENTER,
+            textColor=colors.HexColor("#111827"),
+        )
+        style_td_l = ParagraphStyle(
+            "TDL",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=8,
+            leading=10,
+            alignment=TA_LEFT,
+            textColor=colors.HexColor("#111827"),
+        )
+
+        story = []
+
+        for idx, cdata in enumerate(class_data_list):
+            if idx > 0:
+                story.append(PageBreak())
+
+            crow = cdata["class_row"]
+            st_list = cdata["students"]
+            held = cdata["total_held"]
+
+            eligible_cnt = sum(1 for s in st_list if s["status"] == "ELIGIBLE")
+            condonation_cnt = sum(1 for s in st_list if s["status"] == "CONDONATION")
+            detained_cnt = sum(1 for s in st_list if s["status"] == "DETAINED")
+            avg_pct = round(sum(s["pct"] for s in st_list) / len(st_list), 1) if st_list else 0.0
+
+            story.append(Paragraph("GAYATRI VIDYA PARISHAD COLLEGE FOR DEGREE AND P.G. COURSES (AUTONOMOUS)", style_title))
+            story.append(Spacer(1, 2))
+            story.append(Paragraph("INSTITUTE OF HEALTH CARE AND MEDICAL RESEARCH (GVP IHLR) · VISAKHAPATNAM", style_inst))
+            story.append(Paragraph(f"DEPARTMENT OF COMPUTER APPLICATIONS (MCA) · MONTHLY ATTENDANCE REPORT — {month_label.upper()}", style_sub))
+            story.append(Spacer(1, 6))
+
+            meta_text = (
+                f"<b>Class:</b> {crow['name']} ({crow['code']}) &nbsp;&nbsp;|&nbsp;&nbsp; "
+                f"<b>Total Students:</b> {len(st_list)} &nbsp;&nbsp;|&nbsp;&nbsp; "
+                f"<b>Periods Held:</b> {held} &nbsp;&nbsp;|&nbsp;&nbsp; "
+                f"<b>Class Average:</b> {avg_pct}% &nbsp;&nbsp;|&nbsp;&nbsp; "
+                f"<b>Eligible (≥75%):</b> {eligible_cnt} &nbsp;&nbsp;|&nbsp;&nbsp; "
+                f"<b>Condonation (65-74%):</b> {condonation_cnt} &nbsp;&nbsp;|&nbsp;&nbsp; "
+                f"<b>Detained (&lt;65%):</b> {detained_cnt}"
+            )
+            story.append(Paragraph(meta_text, style_meta))
+            story.append(Spacer(1, 8))
+
+            table_data = [[
+                Paragraph("<b>S.No</b>", style_th),
+                Paragraph("<b>Register No</b>", style_th),
+                Paragraph("<b>Student Full Name</b>", style_th),
+                Paragraph("<b>Classes Held</b>", style_th),
+                Paragraph("<b>Attended</b>", style_th),
+                Paragraph("<b>Attendance %</b>", style_th),
+                Paragraph("<b>Eligibility Status</b>", style_th),
+            ]]
+
+            for s_idx, st in enumerate(st_list, start=1):
+                status_color = "#059669" if st["status"] == "ELIGIBLE" else ("#D97706" if st["status"] == "CONDONATION" else "#DC2626")
+                status_p = Paragraph(f"<font color='{status_color}'><b>{st['status']}</b></font>", style_td_c)
+                pct_p = Paragraph(f"<b>{st['pct']}%</b>", style_td_c)
+                table_data.append([
+                    Paragraph(str(s_idx), style_td_c),
+                    Paragraph(st["register_no"], style_td_c),
+                    Paragraph(st["name"], style_td_l),
+                    Paragraph(str(st["held"]), style_td_c),
+                    Paragraph(str(st["attended"]), style_td_c),
+                    pct_p,
+                    status_p,
+                ])
+
+            col_widths = [34, 90, 240, 80, 80, 90, 110]
+            t = Table(table_data, colWidths=col_widths, repeatRows=1)
+            t_style = [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0D2F24")),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 3.5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#D1D5DB")),
+            ]
+            for r_i in range(1, len(table_data)):
+                if r_i % 2 == 0:
+                    t_style.append(("BACKGROUND", (0, r_i), (-1, r_i), colors.HexColor("#F9FAFB")))
+            t.setStyle(TableStyle(t_style))
+            story.append(t)
+
+            story.append(Spacer(1, 24))
+
+            sig_data = [
+                [
+                    Paragraph("____________________________<br/><b>Class Faculty In-Charge</b>", style_td_c),
+                    Paragraph("____________________________<br/><b>Head of Department (MCA)</b>", style_td_c),
+                    Paragraph("____________________________<br/><b>Principal / Director</b>", style_td_c),
+                ],
+                [
+                    Paragraph(f"Date: {date.today().strftime('%d-%m-%Y')}", style_td_c),
+                    Paragraph("", style_td_c),
+                    Paragraph("College Seal", style_td_c),
+                ]
+            ]
+            sig_table = Table(sig_data, colWidths=[240, 240, 244])
+            sig_table.setStyle(TableStyle([
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ]))
+            story.append(KeepTogether(sig_table))
+
+        doc.build(story)
+        try:
+            with get_db() as conn:
+                audit(
+                    conn,
+                    "admin" if admin else "teacher",
+                    teacher_id,
+                    "export_students_pdf",
+                    f"class={'ALL' if is_all_classes else target_classes[0]['code']} month={year}-{month:02d}",
+                )
+        except Exception:
+            pass
+
         return buffer.getvalue(), filename
 
     # ------------------------------------------------------------------ misc

@@ -39,6 +39,10 @@
 
       <div class="app-header__actions">
         <span class="live-pill live-pill--header"><span></span> Admin</span>
+        <button class="icon-button theme-toggle" id="themeToggleBtn" type="button" aria-label="Toggle theme" title="Toggle dark mode">
+          <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
         <div class="profile-chip" id="headerProfileChip" role="button" tabindex="0" title="Click to view & edit your profile">
           <span class="avatar avatar--teacher" id="teacherAvatar" aria-hidden="true">—</span>
           <span class="profile-chip__text">
@@ -477,6 +481,10 @@
           <button class="btn btn--dark btn--small" id="studentsDownloadButton" type="button">
             <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 3.5v9.5M6.8 9.7L10 12.9l3.2-3.2M4.5 15.5h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <span id="studentsDownloadText">Download Excel</span>
+          </button>
+          <button class="btn btn--outline btn--small" id="studentsDownloadPdfButton" type="button" style="display:inline-flex; align-items:center; gap:6px;">
+            <svg viewBox="0 0 20 20" fill="none" width="16" height="16" stroke="currentColor" stroke-width="1.7"><path d="M4 3h8l4 4v10a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M12 3v4h4M7 13h6M7 10h6"/></svg>
+            <span id="studentsDownloadPdfText">Download PDF Sheet</span>
           </button>
         </div>
         <div class="records-foot">

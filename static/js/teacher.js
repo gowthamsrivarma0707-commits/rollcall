@@ -2046,6 +2046,55 @@ const state = {
     }
   }
 
+  async function downloadStudentsPdfReport() {
+    const button = $("studentsDownloadPdfButton");
+    const label = $("studentsDownloadPdfText");
+    const monthInput = $("studentsExportMonth");
+    const classFilter = $("studentsClassFilter");
+    const params = new URLSearchParams();
+    if (monthInput && monthInput.value) params.set("month", monthInput.value);
+    if (classFilter && classFilter.value) params.set("class_id", classFilter.value);
+
+    setButtonLoading(button, true);
+    if (label) label.textContent = "Building PDF…";
+    try {
+      const response = await fetch(
+        `/api/teacher/students/export/pdf?${params.toString()}`,
+        { credentials: "same-origin" }
+      );
+      if (!response.ok) {
+        let message = "Could not build the PDF report. Please try again.";
+        try {
+          const detail = await response.json();
+          if (detail && detail.error) message = detail.error;
+        } catch {
+          // keep the default message
+        }
+        throw new Error(message);
+      }
+      const blob = await response.blob();
+      let filename = "RollCall-Attendance-Report.pdf";
+      const disposition = response.headers.get("Content-Disposition") || "";
+      const match = disposition.match(/filename="([^"]+)"/);
+      if (match && match[1]) filename = match[1];
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast("Official PDF Attendance Sheet downloaded.");
+    } catch (error) {
+      toast(error.message, "error");
+    } finally {
+      setButtonLoading(button, false);
+      if (label) label.textContent = "Download PDF Sheet";
+    }
+  }
+
   /* ---------------------------------------------------------
      Electives (Semester 2) Management
      --------------------------------------------------------- */
@@ -2764,6 +2813,7 @@ const state = {
   $("studentsSubjectFilter")?.addEventListener("change", () => loadStudents());
   $("studentsRefreshButton")?.addEventListener("click", () => loadStudents());
   $("studentsDownloadButton")?.addEventListener("click", downloadStudentsReport);
+  $("studentsDownloadPdfButton")?.addEventListener("click", downloadStudentsPdfReport);
 
   document.addEventListener("click", (event) => {
     const openButton = event.target.closest("[data-open-mark]");

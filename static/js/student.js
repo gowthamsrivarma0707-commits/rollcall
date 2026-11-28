@@ -84,8 +84,132 @@
     return `${value} ${plural(value, singular, pluralWord)}`;
   }
 
+  let currentOverall = null;
+
+  function initBunkCalculator() {
+    const missInput = $("calcMissCount");
+    const attendInput = $("calcAttendCount");
+    if (!missInput || !attendInput) return;
+
+    $("btnMinusMiss")?.addEventListener("click", () => {
+      missInput.value = Math.max(0, parseInt(missInput.value || 0, 10) - 1);
+      renderBunkCalculation();
+    });
+    $("btnPlusMiss")?.addEventListener("click", () => {
+      missInput.value = parseInt(missInput.value || 0, 10) + 1;
+      renderBunkCalculation();
+    });
+    $("btnMinusAttend")?.addEventListener("click", () => {
+      attendInput.value = Math.max(0, parseInt(attendInput.value || 0, 10) - 1);
+      renderBunkCalculation();
+    });
+    $("btnPlusAttend")?.addEventListener("click", () => {
+      attendInput.value = parseInt(attendInput.value || 0, 10) + 1;
+      renderBunkCalculation();
+    });
+
+    missInput.addEventListener("input", renderBunkCalculation);
+    attendInput.addEventListener("input", renderBunkCalculation);
+
+    $("chipMissTomorrow")?.addEventListener("click", () => {
+      missInput.value = parseInt(missInput.value || 0, 10) + 4;
+      renderBunkCalculation();
+    });
+    $("chipAttendWeek")?.addEventListener("click", () => {
+      attendInput.value = parseInt(attendInput.value || 0, 10) + 30;
+      renderBunkCalculation();
+    });
+    $("chipResetCalc")?.addEventListener("click", () => {
+      missInput.value = 0;
+      attendInput.value = 0;
+      renderBunkCalculation();
+    });
+  }
+
+  function renderBunkCalculation() {
+    if (!currentOverall) return;
+    const baseAttended = Number(currentOverall.attended) || 0;
+    const baseTotal = Number(currentOverall.total) || 0;
+    const missCount = Math.max(0, parseInt($("calcMissCount")?.value || 0, 10));
+    const attendCount = Math.max(0, parseInt($("calcAttendCount")?.value || 0, 10));
+
+    const simAttended = baseAttended + attendCount;
+    const simTotal = baseTotal + attendCount + missCount;
+    const simPct = simTotal > 0 ? (simAttended / simTotal) * 100 : 0;
+    const formattedPct = simPct.toFixed(1);
+
+    const percentVal = $("calcPercentVal");
+    const fractionVal = $("calcFractionVal");
+    const progressFill = $("calcProgressFill");
+    const statusTag = $("calcStatusTag");
+    const diffText = $("calcDiffText");
+    const verdictText = $("calcVerdictText");
+
+    if (percentVal) percentVal.textContent = `${formattedPct}%`;
+    if (fractionVal) fractionVal.textContent = `${simAttended} / ${simTotal} periods`;
+
+    // Progress bar fill & marker
+    if (progressFill) {
+      const clampWidth = Math.min(100, Math.max(0, simPct));
+      progressFill.style.width = `${clampWidth}%`;
+      progressFill.classList.remove("fill--amber", "fill--red");
+      if (simPct < 65) {
+        progressFill.classList.add("fill--red");
+      } else if (simPct < 75) {
+        progressFill.classList.add("fill--amber");
+      }
+    }
+
+    // Baseline diff
+    const basePct = baseTotal > 0 ? (baseAttended / baseTotal) * 100 : 0;
+    const diff = simPct - basePct;
+    if (diffText) {
+      if (missCount === 0 && attendCount === 0) {
+        diffText.textContent = "Current baseline";
+        diffText.style.color = "var(--muted)";
+      } else if (diff > 0) {
+        diffText.textContent = `+${diff.toFixed(1)}% improvement`;
+        diffText.style.color = "var(--green)";
+      } else if (diff < 0) {
+        diffText.textContent = `${diff.toFixed(1)}% drop`;
+        diffText.style.color = "var(--coral)";
+      } else {
+        diffText.textContent = "No change";
+        diffText.style.color = "var(--muted)";
+      }
+    }
+
+    // Status tag & verdict
+    if (statusTag && verdictText) {
+      statusTag.classList.remove("tag--amber", "tag--red");
+
+      if (simPct >= 75) {
+        statusTag.textContent = "75% ELIGIBLE";
+        const maxCanSkip = Math.floor(simAttended / 0.75 - simTotal);
+        if (maxCanSkip > 0) {
+          verdictText.innerHTML = `🟢 <strong>You are in the safe zone!</strong> With this simulation, your attendance is <strong>${formattedPct}%</strong>. You can miss up to <strong>${maxCanSkip} more ${plural(maxCanSkip, "period")}</strong> before dropping below 75%.`;
+        } else {
+          verdictText.innerHTML = `🟡 <strong>On the edge!</strong> With this simulation, you are at <strong>${formattedPct}%</strong>. Missing even 1 more period will drop you below 75%.`;
+        }
+      } else if (simPct >= 65) {
+        statusTag.textContent = "CONDONATION ZONE";
+        statusTag.classList.add("tag--amber");
+        const needed = Math.ceil(3 * simTotal - 4 * simAttended);
+        verdictText.innerHTML = `⚠️ <strong>Condonation range (65%–74%)!</strong> Your simulated attendance is <strong>${formattedPct}%</strong>. You will need college medical condonation to sit for exams. Attend the next <strong>${needed} consecutive ${plural(needed, "period")}</strong> without absence to recover to 75%.`;
+      } else {
+        statusTag.textContent = "DETAINED WARNING";
+        statusTag.classList.add("tag--red");
+        const needed = Math.ceil(3 * simTotal - 4 * simAttended);
+        verdictText.innerHTML = `🚨 <strong>Critical Shortage (&lt;65%)!</strong> With this simulation, your attendance falls to <strong>${formattedPct}%</strong>. You risk exam detention! You must attend the next <strong>${needed} consecutive ${plural(needed, "period")}</strong> to climb back to 75%.`;
+      }
+    }
+  }
+
   function renderGuidance(data) {
     const overall = data.overall;
+    currentOverall = overall;
+    renderBunkCalculation();
+
     const skipCard = $("skipCard");
     const recoverCard = $("recoverCard");
     skipCard.classList.remove("is-active", "is-muted");
@@ -471,6 +595,7 @@
 
   $("refreshButton")?.addEventListener("click", () => load());
   $("retryButton")?.addEventListener("click", () => load());
+  initBunkCalculator();
 
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) load({ silent: true });

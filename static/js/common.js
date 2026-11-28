@@ -249,6 +249,48 @@
     { passive: true }
   );
 
+  // Theme management (Dark Mode)
+  function initTheme() {
+    try {
+      const saved = localStorage.getItem("rollcall_theme");
+      const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      if (saved === "dark" || (!saved && prefersDark)) {
+        document.documentElement.classList.add("dark-theme");
+      } else {
+        document.documentElement.classList.remove("dark-theme");
+      }
+    } catch {
+      /* localStorage blocked */
+    }
+  }
+
+  function toggleTheme() {
+    const isDark = document.documentElement.classList.toggle("dark-theme");
+    try {
+      localStorage.setItem("rollcall_theme", isDark ? "dark" : "light");
+    } catch {
+      /* localStorage blocked */
+    }
+    updateThemeButtons(isDark);
+  }
+
+  function updateThemeButtons(isDark) {
+    document.querySelectorAll(".theme-toggle").forEach((btn) => {
+      btn.setAttribute("aria-label", isDark ? "Switch to light theme" : "Switch to dark theme");
+      btn.setAttribute("title", isDark ? "Switch to light theme" : "Switch to dark theme");
+    });
+  }
+
+  initTheme();
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const isDark = document.documentElement.classList.contains("dark-theme");
+    updateThemeButtons(isDark);
+    document.querySelectorAll(".theme-toggle").forEach((btn) => {
+      btn.addEventListener("click", toggleTheme);
+    });
+  });
+
   window.RollCall = {
     api,
     toast,
@@ -262,5 +304,6 @@
     plural,
     setButtonLoading,
     logout,
+    toggleTheme,
   };
 })();

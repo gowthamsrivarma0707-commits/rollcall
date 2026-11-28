@@ -41,6 +41,102 @@
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
+html.dark-theme {
+  --bg: #0b1411;
+  --bg-soft: #111e19;
+  --surface: #162620;
+  --surface-2: #1e332b;
+  --ink: #eaf3ee;
+  --ink-soft: #c8d9d0;
+  --muted: #8ca397;
+  --muted-light: #5d7568;
+  --line: #263c33;
+  --line-strong: #365447;
+  --green: #34b382;
+  --green-deep: #0a1f16;
+  --green-dark: #06150f;
+  --green-soft: #17382a;
+  --lime: #d2f044;
+  --lime-soft: #233310;
+  --lime-deep: #a5c426;
+  --coral: #f3836b;
+  --coral-soft: #381f18;
+  --sand: #e8c98e;
+  --sand-soft: #382c16;
+  --white: #162620;
+  --danger: #e2614e;
+  --shadow-sm: 0 8px 24px -18px rgba(0, 0, 0, 0.7);
+  --shadow-md: 0 24px 70px -38px rgba(0, 0, 0, 0.85);
+  --shadow-lg: 0 40px 100px -42px rgba(0, 0, 0, 0.95);
+  color-scheme: dark;
+}
+
+/* Theme Toggle Button */
+.theme-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+  flex-shrink: 0;
+}
+.theme-toggle:hover {
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+}
+.theme-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+.theme-toggle .theme-icon-sun {
+  display: none;
+}
+.theme-toggle .theme-icon-moon {
+  display: block;
+}
+html.dark-theme .theme-toggle .theme-icon-sun {
+  display: block;
+  color: #fbbf24;
+}
+html.dark-theme .theme-toggle .theme-icon-moon {
+  display: none;
+}
+
+/* Dark mode overrides for dialogs and native inputs */
+html.dark-theme .modal-card,
+html.dark-theme [role="dialog"],
+html.dark-theme #modalForgotInfo > div {
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--line);
+}
+html.dark-theme input,
+html.dark-theme select,
+html.dark-theme textarea {
+  background: var(--surface-2);
+  color: var(--ink);
+  border-color: var(--line);
+}
+html.dark-theme input::placeholder,
+html.dark-theme textarea::placeholder {
+  color: var(--muted);
+}
+html.dark-theme .table-wrap,
+html.dark-theme .tt-table,
+html.dark-theme .records-table {
+  color: var(--ink);
+}
+html.dark-theme tbody tr:hover td {
+  background: var(--surface-2) !important;
+}
+
 *,
 *::before,
 *::after {
