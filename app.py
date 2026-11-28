@@ -994,6 +994,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
         self._send_bytes(
             candidate.read_bytes(),
             content_type,
+            extra_headers=[("Cache-Control", "no-cache, must-revalidate")],
             head_only=self.command == "HEAD",
         )
 
