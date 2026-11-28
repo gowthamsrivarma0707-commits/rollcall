@@ -2836,6 +2836,7 @@ const state = {
   function checkFirstLoginPasswordTeacher(teacher, isAdminView) {
     const modal = $("modalFirstLoginPassword");
     if (teacher?.must_change_password && !isAdminView && modal) {
+      modal.style.display = "flex";
       modal.hidden = false;
     }
   }
@@ -2868,7 +2869,10 @@ const state = {
         confirm_password: p2,
       });
       const modal = $("modalFirstLoginPassword");
-      if (modal) modal.hidden = true;
+      if (modal) {
+        modal.style.display = "none";
+        modal.hidden = true;
+      }
       toast(res.message || "Password updated successfully!");
       loadDashboard({ silent: true });
     } catch (err) {

@@ -313,7 +313,10 @@
           </div>
         `;
       }
-      if (modalForgotInfo) modalForgotInfo.hidden = false;
+      if (modalForgotInfo) {
+        modalForgotInfo.style.display = "flex";
+        modalForgotInfo.hidden = false;
+      }
     } else if (currentRole === "teacher") {
       e.preventDefault();
       if (forgotInfoBody) {
@@ -325,16 +328,25 @@
           </div>
         `;
       }
-      if (modalForgotInfo) modalForgotInfo.hidden = false;
+      if (modalForgotInfo) {
+        modalForgotInfo.style.display = "flex";
+        modalForgotInfo.hidden = false;
+      }
     }
   });
 
   btnCloseForgotInfo?.addEventListener("click", () => {
-    if (modalForgotInfo) modalForgotInfo.hidden = true;
+    if (modalForgotInfo) {
+      modalForgotInfo.style.display = "none";
+      modalForgotInfo.hidden = true;
+    }
   });
 
   modalForgotInfo?.addEventListener("click", (e) => {
-    if (e.target === modalForgotInfo) modalForgotInfo.hidden = true;
+    if (e.target === modalForgotInfo) {
+      modalForgotInfo.style.display = "none";
+      modalForgotInfo.hidden = true;
+    }
   });
 
   // Register service worker on login page as well

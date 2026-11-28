@@ -483,6 +483,7 @@
   function checkFirstLoginPassword(student) {
     const modal = $("modalFirstLoginPassword");
     if (student?.must_change_password && modal) {
+      modal.style.display = "flex";
       modal.hidden = false;
     }
   }
@@ -517,7 +518,10 @@
         confirm_password: p2,
       });
       const modal = $("modalFirstLoginPassword");
-      if (modal) modal.hidden = true;
+      if (modal) {
+        modal.style.display = "none";
+        modal.hidden = true;
+      }
       if (window.RollCall?.toast) {
         window.RollCall.toast(res.message || "Password updated successfully!");
       } else {
