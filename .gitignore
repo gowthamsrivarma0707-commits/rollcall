@@ -4,3 +4,16 @@ __pycache__/
 *.log
 .server.*
 screenshots/
+.env
+.env.*
+*.db-wal
+*.db-shm
+*.sqlite*
+.chrome_*
+make_token.py
+test_*.py
+scratch/
+.agents/
+.gravitas/
+.opencode/
+

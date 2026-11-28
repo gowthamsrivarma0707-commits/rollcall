@@ -58,8 +58,24 @@ TEMPLATE_DIR = ROOT / "templates"
 STATIC_DIR = ROOT / "static"
 DEFAULT_DB_PATH = ROOT / "attendance.db"
 
+def _load_env() -> None:
+    env_file = ROOT / ".env"
+    if env_file.is_file():
+        try:
+            for line in env_file.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    k, v = k.strip(), v.strip().strip("\"'")
+                    if k and k not in os.environ:
+                        os.environ[k] = v
+        except Exception:
+            pass
+
+_load_env()
+
 HOST = os.environ.get("ROLLCALL_HOST", "127.0.0.1")
-PORT = int(os.environ.get("ROLLCALL_PORT", "8000"))
+PORT = int(os.environ.get("PORT") or os.environ.get("ROLLCALL_PORT", "8000"))
 DB_PATH = Path(os.environ.get("ROLLCALL_DB", DEFAULT_DB_PATH))
 if os.environ.get("VERCEL") and not os.environ.get("ROLLCALL_DB"):
     _vercel_db = Path("/tmp/attendance.db")
@@ -100,6 +116,8 @@ def session_cookie_name(role: str | None) -> str:
 
 SCHEMA = """
 PRAGMA journal_mode = WAL;
+PRAGMA foreign_keys = ON;
+PRAGMA synchronous = NORMAL;
 
 CREATE TABLE IF NOT EXISTS classes (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -232,6 +250,15 @@ CREATE TABLE IF NOT EXISTS elective_enrollments (
     enrolled_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    token_hash TEXT PRIMARY KEY,
+    role       TEXT NOT NULL,
+    user_id    INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    used       INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE INDEX IF NOT EXISTS idx_students_class
     ON students(class_id);
 CREATE INDEX IF NOT EXISTS idx_assignments_teacher
@@ -263,6 +290,7 @@ def get_db():
     conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA synchronous = NORMAL")
     try:
         yield conn
         conn.commit()
@@ -280,6 +308,17 @@ def init_db(reset: bool = False) -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with get_db() as conn:
         conn.executescript(SCHEMA)
+        try:
+            if DB_PATH.exists() and hasattr(os, "chmod") and os.name != "nt":
+                os.chmod(DB_PATH, 0o600)
+        except Exception:
+            pass
+        try:
+            chk = conn.execute("PRAGMA quick_check").fetchone()
+            if chk and chk[0] != "ok":
+                sys.stderr.write(f"[WARN] Database integrity check returned: {chk[0]}\n")
+        except Exception:
+            pass
         session_columns = {
             row["name"]
             for row in conn.execute("PRAGMA table_info(attendance_sessions)")
@@ -696,6 +735,18 @@ roster_limiter = RequestLimiter(max_requests=240, window_seconds=60)
 export_limiter = RequestLimiter(max_requests=10, window_seconds=3600)
 # Caps repeated password resets per account and per address.
 password_reset_limiter = RequestLimiter(max_requests=20, window_seconds=10 * 60)
+# Rate limiter for student roster bulk imports.
+import_limiter = RequestLimiter(max_requests=10, window_seconds=10 * 60)
+
+
+def log_security_event(event_type: str, ip: str, detail: str = "") -> None:
+    now_iso = datetime.now().isoformat(timespec="seconds")
+    sys.stderr.write(f"[SECURITY] [{now_iso}] [{ip}] {event_type}: {detail}\n")
+    try:
+        with get_db() as conn:
+            audit(conn, "security", None, event_type, f"ip={ip} {detail}")
+    except Exception:
+        pass
 
 
 class RollCallServer(ThreadingHTTPServer):
@@ -727,6 +778,29 @@ class RollCallHandler(BaseHTTPRequestHandler):
         parsed = urlsplit(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
+        low_path = path.lower()
+
+        # Hard-block direct HTTP probes for database, environment, or secret files
+        if (
+            low_path in {
+                "/attendance.db", "/app.py", "/security.py", "/seed_data.py",
+                "/make_admin.py", "/make_token.py", "/render.yaml", "/vercel.json",
+                "/requirements.txt", "/.env"
+            }
+            or low_path.startswith(("/.git", "/.env", "/.chrome", "/.agent", "/.gravitas", "/.open"))
+            or low_path.endswith((".db", ".sqlite", ".sqlite3", ".py", ".env", ".log", ".yaml", ".yml", ".bak", ".sh", ".bat"))
+        ):
+            log_security_event("sensitive_path_blocked", self._client_ip(), f"Blocked path={path}")
+            raise ApiError(404, "Page not found.")
+
+        # Enforce HTTPS on cloud proxies (Render, Vercel, Cloudflare, AWS)
+        proto = (self.headers.get("X-Forwarded-Proto") or "").strip().lower()
+        if proto == "http":
+            host = self.headers.get("X-Forwarded-Host") or self.headers.get("Host") or ""
+            if host:
+                self._redirect(f"https://{host}{self.path}", status=301)
+                return
+
         try:
             if method in ("GET", "HEAD"):
                 self._handle_get(path, query, head_only=(method == "HEAD"))
@@ -782,16 +856,21 @@ class RollCallHandler(BaseHTTPRequestHandler):
     def _security_headers(self) -> None:
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
-        self.send_header("Referrer-Policy", "same-origin")
+        self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
+        self.send_header("X-XSS-Protection", "1; mode=block")
         self.send_header(
-            "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
+            "Permissions-Policy", "camera=(self), microphone=(), geolocation=()"
         )
         self.send_header("Cross-Origin-Resource-Policy", "same-origin")
         self.send_header("Cross-Origin-Opener-Policy", "same-origin")
         self.send_header("X-Robots-Tag", "noindex, nofollow")
-        if self.headers.get("X-Forwarded-Proto", "").lower() == "https":
+        if (
+            self.headers.get("X-Forwarded-Proto", "").lower() == "https"
+            or os.environ.get("RENDER")
+            or os.environ.get("VERCEL")
+        ):
             self.send_header(
-                "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+                "Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload"
             )
         self.send_header(
             "Content-Security-Policy",
@@ -896,11 +975,15 @@ class RollCallHandler(BaseHTTPRequestHandler):
     def _serve_static(self, request_path: str) -> None:
         relative = unquote(request_path[len("/static/") :])
         candidate = (STATIC_DIR / relative).resolve()
+        blocked_suffixes = {".py", ".db", ".sqlite", ".json", ".yaml", ".yml", ".env", ".md", ".sh", ".bat", ".bak", ".log"}
         if (
             STATIC_DIR.resolve() not in candidate.parents
             or not candidate.is_file()
+            or candidate.name.startswith(".")
             or candidate.suffix.lower() not in STATIC_SUFFIXES
+            or candidate.suffix.lower() in blocked_suffixes
         ):
+            log_security_event("static_probe_blocked", self._client_ip(), f"Blocked static path={request_path}")
             raise ApiError(404, "File not found.")
         content_type = mimetypes.guess_type(candidate.name)[0] or "application/octet-stream"
         if content_type.startswith("text/") or content_type in {
@@ -934,10 +1017,20 @@ class RollCallHandler(BaseHTTPRequestHandler):
         return payload
 
     def _client_ip(self) -> str:
-        if os.environ.get("VERCEL"):
-            forwarded = (self.headers.get("X-Forwarded-For") or "").split(",", 1)[0].strip()
-            if forwarded:
-                return forwarded
+        # Check CF-Connecting-IP first (Cloudflare reverse proxy)
+        cf_ip = (self.headers.get("CF-Connecting-IP") or "").strip()
+        if cf_ip:
+            return cf_ip
+        # Check X-Forwarded-For (Render, Vercel, standard load balancers)
+        forwarded = (self.headers.get("X-Forwarded-For") or "").strip()
+        if forwarded:
+            client_candidate = forwarded.split(",")[0].strip()
+            if client_candidate:
+                return client_candidate
+        # Check X-Real-IP
+        real_ip = (self.headers.get("X-Real-IP") or "").strip()
+        if real_ip:
+            return real_ip
         addr = getattr(self, "client_address", None)
         if isinstance(addr, (tuple, list)) and addr:
             return str(addr[0])
@@ -947,6 +1040,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
         # Reject requests the browser itself labels as cross-site, even when
         # no Origin header is present.
         if (self.headers.get("Sec-Fetch-Site") or "").strip().lower() == "cross-site":
+            log_security_event("csrf_cross_site_rejected", self._client_ip(), f"Sec-Fetch-Site=cross-site path={self.path}")
             raise ApiError(403, "Request origin was not accepted.")
         origin = self.headers.get("Origin")
         if not origin:
@@ -960,6 +1054,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
             if h and h.strip()
         }
         if urlsplit(origin).netloc.lower() not in hosts:
+            log_security_event("csrf_origin_mismatch", self._client_ip(), f"origin={origin} hosts={hosts} path={self.path}")
             raise ApiError(403, "Request origin was not accepted.")
 
     def _cookie_tokens(self, role: str | None = None) -> list[str]:
@@ -1138,7 +1233,11 @@ class RollCallHandler(BaseHTTPRequestHandler):
             "SameSite=Lax",
             f"Max-Age={SESSION_TTL_SECONDS}",
         ]
-        if self.headers.get("X-Forwarded-Proto", "").lower() == "https":
+        if (
+            self.headers.get("X-Forwarded-Proto", "").lower() == "https"
+            or os.environ.get("RENDER")
+            or os.environ.get("VERCEL")
+        ):
             parts.append("Secure")
         return "; ".join(parts)
 
@@ -1446,6 +1545,12 @@ class RollCallHandler(BaseHTTPRequestHandler):
                 elective_id = int(parts[3])
                 self._assign_elective_faculty(elective_id, session)
                 return
+        if path == "/api/admin/reset-token":
+            self._create_reset_token()
+            return
+        if path == "/api/admin/user/reset-password":
+            self._admin_reset_user_password()
+            return
         if path == "/api/profile/update":
             self._update_profile()
             return
@@ -1473,16 +1578,17 @@ class RollCallHandler(BaseHTTPRequestHandler):
                 retry_after=ip_retry,
             )
 
-        # Keyed by account only: rotating source addresses must not reset the
-        # per-account failure budget.
-        limiter_key = f"{role}|{username.lower()}"
-        retry_after = limiter.retry_after(limiter_key)
-        if retry_after:
-            raise ApiError(
-                429,
-                f"Too many sign-in attempts. Please wait about {retry_after // 60 + 1} minutes.",
-                retry_after=retry_after,
-            )
+        # Students and teachers have sign-in rate limits to prevent brute-force attacks.
+        # Administrators can log in anytime without lockout restrictions.
+        if role != "admin":
+            limiter_key = f"{role}|{username.lower()}"
+            retry_after = limiter.retry_after(limiter_key)
+            if retry_after:
+                raise ApiError(
+                    429,
+                    f"Too many sign-in attempts. Please wait about {retry_after // 60 + 1} minutes.",
+                    retry_after=retry_after,
+                )
 
         with get_db() as conn:
             if role == "student":
@@ -1532,6 +1638,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
         if not row or not valid:
             limiter.fail(limiter_key)
             login_ip_limiter.record(ip_key)
+            log_security_event("failed_login", self._client_ip(), f"role={role} username={username}")
             raise ApiError(401, "Those details do not match an account.")
 
         limiter.clear(limiter_key)
@@ -1578,7 +1685,7 @@ class RollCallHandler(BaseHTTPRequestHandler):
         if role == "student":
             return conn.execute(
                 """
-                SELECT id, password_hash FROM students
+                SELECT id, password_hash, must_change_password FROM students
                 WHERE register_no = ? COLLATE NOCASE AND active = 1
                 """,
                 (username,),
@@ -1586,14 +1693,14 @@ class RollCallHandler(BaseHTTPRequestHandler):
         if role == "teacher":
             return conn.execute(
                 """
-                SELECT id, password_hash FROM teachers
+                SELECT id, password_hash, must_change_password FROM teachers
                 WHERE email = ? COLLATE NOCASE OR employee_id = ? COLLATE NOCASE
                 """,
                 (username, username),
             ).fetchone()
         if role == "admin":
             return conn.execute(
-                "SELECT id, password_hash FROM admins WHERE username = ? COLLATE NOCASE",
+                "SELECT id, password_hash, must_change_password FROM admins WHERE username = ? COLLATE NOCASE",
                 (username,),
             ).fetchone()
         return None
@@ -1736,11 +1843,89 @@ class RollCallHandler(BaseHTTPRequestHandler):
             }
         )
 
+    def _create_reset_token(self) -> None:
+        session, is_admin = self._require_staff_session()
+        if not is_admin:
+            raise ApiError(403, "Administrator access required.")
+        payload = self._read_json()
+        target_role = str(payload.get("role", "")).strip().lower()
+        if target_role not in {"student", "teacher"}:
+            raise ApiError(400, "Can only generate reset tokens for student or teacher accounts.")
+        username = str(payload.get("username", "")).strip()
+        if not username:
+            raise ApiError(400, "Username, register number or employee ID is required.")
+
+        with get_db() as conn:
+            target_user = self._lookup_account(conn, target_role, username)
+            if not target_user:
+                raise ApiError(404, f"No {target_role} found with username/ID '{username}'.")
+            target_id = int(target_user["id"])
+            token = new_session_token()
+            token_fp = token_fingerprint(token)
+            now_ts = int(time.time())
+            expires_at = now_ts + 900  # 15 minutes
+            conn.execute(
+                """
+                INSERT INTO password_reset_tokens (token_hash, role, user_id, created_at, expires_at, used)
+                VALUES (?, ?, ?, ?, ?, 0)
+                """,
+                (token_fp, target_role, target_id, now_ts, expires_at),
+            )
+            audit(conn, session["role"], session["user_id"], "issue_reset_token", f"For {target_role}:{username}")
+
+        self._send_json({
+            "ok": True,
+            "message": "Reset token generated successfully. Valid for 15 minutes.",
+            "reset_token": token,
+            "expires_in_seconds": 900,
+            "reset_url": f"/change-password?token={token}&role={target_role}&username={username}",
+        })
+
+    def _admin_reset_user_password(self) -> None:
+        session, is_admin = self._require_staff_session()
+        if not is_admin:
+            raise ApiError(403, "Administrator access required.")
+        payload = self._read_json()
+        target_role = str(payload.get("role", "")).strip().lower()
+        if target_role not in {"student", "teacher"}:
+            raise ApiError(400, "Can only reset passwords for student or teacher accounts.")
+        username = str(payload.get("username", "")).strip()
+        if not username:
+            raise ApiError(400, "Username, register number or employee ID is required.")
+
+        default_pw = "student123" if target_role == "student" else "teacher123"
+        new_pw = str(payload.get("new_password", "")).strip() or default_pw
+
+        with get_db() as conn:
+            user = self._lookup_account(conn, target_role, username)
+            if not user:
+                raise ApiError(404, f"No {target_role} found with username/ID '{username}'.")
+            user_id = int(user["id"])
+            table = "students" if target_role == "student" else "teachers"
+            # Reset password to default and mark must_change_password = 1 so the user can set a new password on first login
+            conn.execute(
+                f"UPDATE {table} SET password_hash = ?, must_change_password = 1 WHERE id = ?",
+                (hash_password(new_pw), user_id),
+            )
+            # Invalidate any existing sessions for this user
+            conn.execute("DELETE FROM sessions WHERE role = ? AND user_id = ?", (target_role, user_id))
+            audit(conn, session["role"], session["user_id"], "admin_reset_password", f"Reset {target_role}:{username} to default ({new_pw})")
+
+        self._send_json({
+            "ok": True,
+            "message": f"Successfully reset {target_role} '{username}' to initial password ({new_pw}). They can now set their password again on first sign-in.",
+            "temporary_password": new_pw,
+        })
+
     def _reset_password(self) -> None:
         payload = self._read_json()
         role = str(payload.get("role", "")).strip().lower()
         if role not in {"student", "teacher", "admin"}:
             raise ApiError(400, "Choose a valid account type.")
+        if role == "admin":
+            log_security_event("admin_reset_blocked", self._client_ip(), "Blocked public self-service reset attempt on admin account")
+            raise ApiError(403, "Administrator credentials cannot be reset through public self-service. Contact your systems administrator or use the server CLI.")
+
         username = str(payload.get("username", "")).strip()
         if not username:
             raise ApiError(400, "Enter your register number, employee ID or e-mail.")
@@ -1752,6 +1937,9 @@ class RollCallHandler(BaseHTTPRequestHandler):
             raise ApiError(
                 400, "The new password and confirmation do not match."
             )
+
+        current_password = payload.get("current_password")
+        reset_token = str(payload.get("reset_token", "")).strip()
 
         # Teachers may optionally move the account to a new employee ID or
         # e-mail in the same call. Students are fixed to their register number.
@@ -1794,8 +1982,40 @@ class RollCallHandler(BaseHTTPRequestHandler):
             if not row:
                 raise ApiError(404, "No account matches that username.")
             user_id = int(row["id"])
+
+            is_first_time = bool(row["must_change_password"])
+
+            # Verify authentication via reset token, first-time status, or current password
+            if reset_token:
+                # Reset token provided: strictly validate token expiration and single-use
+                now_ts = int(time.time())
+                token_fp = token_fingerprint(reset_token)
+                t_row = conn.execute(
+                    "SELECT token_hash, role, user_id, expires_at, used FROM password_reset_tokens WHERE token_hash = ?",
+                    (token_fp,),
+                ).fetchone()
+                if not t_row or t_row["used"] or t_row["expires_at"] < now_ts or t_row["role"] != role or int(t_row["user_id"]) != user_id:
+                    log_security_event("invalid_reset_token", self._client_ip(), f"token failed for {role}:{username}")
+                    raise ApiError(403, "The password reset token is invalid or has expired. Please contact an administrator for a new token.")
+                conn.execute("UPDATE password_reset_tokens SET used = 1 WHERE token_hash = ?", (token_fp,))
+            elif is_first_time:
+                # First-time setup from initial default password (e.g. student123):
+                # Allowed directly without requiring admin token.
+                pass
+            elif current_password:
+                if not verify_password(str(current_password), row["password_hash"]):
+                    log_security_event("failed_reset_password_auth", self._client_ip(), f"{role}:{username}")
+                    raise ApiError(401, "Current password is not correct.")
+            else:
+                # Second-time reset without token or current password: admin intervention required!
+                raise ApiError(
+                    403,
+                    "This account has already set a custom password. If you forgot your password, please contact the college Administrator to reset your account."
+                )
+
             self._update_password(conn, role, user_id, new_password)
             audit(conn, role, user_id, "password_reset")
+            log_security_event("password_reset_success", self._client_ip(), f"role={role} user_id={user_id} first_time={is_first_time}")
 
             changed_note = ""
             if role == "teacher":
@@ -3028,6 +3248,9 @@ class RollCallHandler(BaseHTTPRequestHandler):
         session, is_admin = self._require_staff_session()
         if not is_admin:
             raise ApiError(403, "Administrator access required.")
+        retry = import_limiter.hit(f"import|{self._client_ip()}")
+        if retry:
+            raise ApiError(429, f"Too many import attempts. Please wait about {retry // 60 + 1} minutes.", retry_after=retry)
         payload = self._read_json()
 
         rows_to_process: list[dict] = []
@@ -3035,37 +3258,55 @@ class RollCallHandler(BaseHTTPRequestHandler):
             rows_to_process = payload["rows"]
         elif "csv_text" in payload:
             import csv
-            reader = csv.DictReader(io.StringIO(payload["csv_text"]))
-            for r in reader:
-                rows_to_process.append(dict(r))
+            try:
+                reader = csv.DictReader(io.StringIO(payload["csv_text"]))
+                for r in reader:
+                    rows_to_process.append(dict(r))
+            except Exception:
+                raise ApiError(400, "Invalid CSV data format.")
         elif "file_base64" in payload:
             import base64
-            file_bytes = base64.b64decode(payload["file_base64"])
+            try:
+                file_bytes = base64.b64decode(payload["file_base64"])
+            except Exception:
+                raise ApiError(400, "Invalid base64 encoded file payload.")
+            if len(file_bytes) > 5_000_000:
+                raise ApiError(400, "File size exceeds 5MB limit.")
             filename = str(payload.get("filename", "")).lower()
             if filename.endswith(".csv"):
                 import csv
-                text = file_bytes.decode("utf-8", errors="ignore")
-                reader = csv.DictReader(io.StringIO(text))
-                for r in reader:
-                    rows_to_process.append(dict(r))
+                try:
+                    text = file_bytes.decode("utf-8", errors="ignore")
+                    reader = csv.DictReader(io.StringIO(text))
+                    for r in reader:
+                        rows_to_process.append(dict(r))
+                except Exception:
+                    raise ApiError(400, "Could not parse uploaded CSV file.")
             else:
-                import openpyxl
-                wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
-                ws = wb.active
-                sheet_rows = list(ws.iter_rows(values_only=True))
-                if sheet_rows:
-                    header = [str(h or "").strip().lower() for h in sheet_rows[0]]
-                    for row in sheet_rows[1:]:
-                        if not any(row):
-                            continue
-                        row_dict = {}
-                        for idx, val in enumerate(row):
-                            if idx < len(header) and header[idx]:
-                                row_dict[header[idx]] = str(val if val is not None else "").strip()
-                        rows_to_process.append(row_dict)
+                if not file_bytes.startswith(b"PK\x03\x04"):
+                    raise ApiError(400, "Invalid Excel workbook format. Please upload a valid .xlsx file.")
+                try:
+                    import openpyxl
+                    wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
+                    ws = wb.active
+                    sheet_rows = list(ws.iter_rows(values_only=True))
+                    if sheet_rows:
+                        header = [str(h or "").strip().lower() for h in sheet_rows[0]]
+                        for row in sheet_rows[1:]:
+                            if not any(row):
+                                continue
+                            row_dict = {}
+                            for idx, val in enumerate(row):
+                                if idx < len(header) and header[idx]:
+                                    row_dict[header[idx]] = str(val if val is not None else "").strip()
+                            rows_to_process.append(row_dict)
+                except Exception:
+                    raise ApiError(400, "Could not read Excel file. Please ensure it is a valid, uncorrupted .xlsx workbook.")
 
         if not rows_to_process:
             raise ApiError(400, "No student records found in the uploaded file.")
+        if len(rows_to_process) > 2000:
+            raise ApiError(400, "Import cannot exceed 2,000 rows at a time.")
 
         with get_db() as conn:
             classes_map = {row["code"].upper(): row["id"] for row in conn.execute("SELECT id, code FROM classes").fetchall()}
@@ -3187,9 +3428,11 @@ class RollCallHandler(BaseHTTPRequestHandler):
             teacher_id = parse_integer(raw_teacher_id, "Invalid teacher selected.")
 
         with get_db() as conn:
-            elective = conn.execute("SELECT id, code, name FROM electives WHERE id = ?", (elective_id,)).fetchone()
+            elective = conn.execute("SELECT id, code, name, teacher_id FROM electives WHERE id = ?", (elective_id,)).fetchone()
             if not elective:
                 raise ApiError(404, "Elective not found.")
+            if not is_admin and (not elective["teacher_id"] or int(elective["teacher_id"]) != int(session["user_id"])):
+                raise ApiError(403, "You are only authorized to manage enrollment for your own elective.")
 
             teacher_name = "Not Assigned"
             teacher_emp_id = ""
@@ -3329,9 +3572,11 @@ class RollCallHandler(BaseHTTPRequestHandler):
         student_id = parse_integer(payload.get("student_id"), "Choose a valid student.")
 
         with get_db() as conn:
-            elective = conn.execute("SELECT id, code, name, capacity FROM electives WHERE id = ?", (elective_id,)).fetchone()
+            elective = conn.execute("SELECT id, code, name, capacity, teacher_id FROM electives WHERE id = ?", (elective_id,)).fetchone()
             if not elective:
                 raise ApiError(404, "Elective not found.")
+            if not is_admin and (not elective["teacher_id"] or int(elective["teacher_id"]) != int(session["user_id"])):
+                raise ApiError(403, "You are only authorized to manage enrollment for your own elective.")
 
             student = conn.execute("SELECT id, register_no, name FROM students WHERE id = ? AND active = 1", (student_id,)).fetchone()
             if not student:
@@ -3374,9 +3619,11 @@ class RollCallHandler(BaseHTTPRequestHandler):
         student_id = parse_integer(payload.get("student_id"), "Choose a valid student.")
 
         with get_db() as conn:
-            elective = conn.execute("SELECT id, code, name FROM electives WHERE id = ?", (elective_id,)).fetchone()
+            elective = conn.execute("SELECT id, code, name, teacher_id FROM electives WHERE id = ?", (elective_id,)).fetchone()
             if not elective:
                 raise ApiError(404, "Elective not found.")
+            if not is_admin and (not elective["teacher_id"] or int(elective["teacher_id"]) != int(session["user_id"])):
+                raise ApiError(403, "You are only authorized to manage enrollment for your own elective.")
 
             student = conn.execute("SELECT id, register_no, name FROM students WHERE id = ?", (student_id,)).fetchone()
             if not student:
@@ -3418,8 +3665,11 @@ class RollCallHandler(BaseHTTPRequestHandler):
             raise ApiError(400, "Qualifications text is too long.")
         if len(bio) > 500:
             raise ApiError(400, "Bio is too long.")
-        if len(photo_base64) > 4_000_000:
-            raise ApiError(400, "Photo is too large. Please choose an image under 3MB.")
+        if photo_base64:
+            if len(photo_base64) > 500_000:
+                raise ApiError(400, "Photo is too large. Please choose an image under 400KB.")
+            if not re.match(r"^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$", photo_base64):
+                raise ApiError(400, "Invalid image format. Allowed formats: PNG, JPEG, WEBP.")
 
         with get_db() as conn:
             if is_admin:

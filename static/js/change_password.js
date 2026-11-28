@@ -8,6 +8,8 @@
   const roleField = document.getElementById("roleField");
   const usernameField = document.getElementById("usernameField");
   const currentPasswordField = document.getElementById("currentPasswordField");
+  const resetTokenField = document.getElementById("resetTokenField");
+  const resetTokenInput = document.getElementById("resetToken");
   const roleSelect = document.getElementById("role");
   const usernameInput = document.getElementById("username");
   const currentPasswordInput = document.getElementById("currentPassword");
@@ -86,6 +88,7 @@
     if (roleField) roleField.hidden = changeMode;
     if (usernameField) usernameField.hidden = changeMode;
     if (currentPasswordField) currentPasswordField.hidden = !changeMode;
+    if (resetTokenField) resetTokenField.hidden = changeMode;
     if (resetUsernameRows) resetUsernameRows.hidden = changeMode;
     if (usernameForm) usernameForm.hidden = true;
     if (!changeMode) applyResetRole(roleSelect?.value || "student");
@@ -157,6 +160,17 @@
     }
     applyMode(false, "student");
     applyUsernameForm(null);
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("token") && resetTokenInput) {
+      resetTokenInput.value = urlParams.get("token");
+    }
+    if (urlParams.get("role") && roleSelect) {
+      roleSelect.value = urlParams.get("role");
+      applyResetRole(urlParams.get("role"));
+    }
+    if (urlParams.get("username") && usernameInput) {
+      usernameInput.value = urlParams.get("username");
+    }
     return false;
   };
 
@@ -255,6 +269,10 @@
           new_password: newPassword,
           confirm_password: confirmPassword,
         };
+        const resetTokenVal = resetTokenInput?.value.trim() || "";
+        if (resetTokenVal) {
+          body.reset_token = resetTokenVal;
+        }
         if (role === "teacher") {
           const employeeId = resetEmployeeId?.value.trim().toUpperCase() || "";
           const email = resetStaffEmail?.value.trim().toLowerCase() || "";

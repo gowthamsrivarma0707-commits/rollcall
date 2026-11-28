@@ -434,7 +434,11 @@ const state = {
     const headerAvatar = $("teacherAvatar");
     if (headerAvatar) {
       if (teacher.photo_base64) {
-        headerAvatar.innerHTML = `<img src="${teacher.photo_base64}" alt="${escapeHTML(teacher.name)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;">`;
+        const img = document.createElement("img");
+        img.src = teacher.photo_base64;
+        img.alt = teacher.name || "Teacher Photo";
+        img.style.cssText = "width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;";
+        headerAvatar.replaceChildren(img);
       } else {
         headerAvatar.textContent = initials(teacher.name);
       }
@@ -1650,6 +1654,11 @@ const state = {
       $("modalImportStudents").hidden = false;
     });
 
+    $("openResetPasswordModal")?.addEventListener("click", () => {
+      $("modalResetPassword").hidden = false;
+      $("resetUserIdentifier")?.focus();
+    });
+
     document.querySelectorAll("[data-close-modal]").forEach((btn) => {
       btn.addEventListener("click", () => {
         document.querySelectorAll(".modal-backdrop").forEach((m) => (m.hidden = true));
@@ -1699,6 +1708,35 @@ const state = {
         $("newTeacherPassword").value = "teacher123";
         $("modalAddFaculty").hidden = true;
         loadDashboard({ silent: true });
+      } catch (err) {
+        toast(err.message, "error");
+      } finally {
+        setButtonLoading(submitBtn, false);
+      }
+    });
+
+    $("formResetUserPassword")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const submitBtn = $("btnSubmitResetPassword");
+      setButtonLoading(submitBtn, true);
+      const successBox = $("resetUserSuccessBox");
+      if (successBox) successBox.hidden = true;
+      try {
+        const res = await api.post("/api/admin/user/reset-password", {
+          role: $("resetUserRole").value,
+          username: $("resetUserIdentifier").value.trim(),
+          new_password: $("resetCustomPassword")?.value.trim() || undefined,
+        });
+        toast(res.message);
+        if (successBox) {
+          successBox.hidden = false;
+          successBox.textContent = res.message;
+        }
+        setTimeout(() => {
+          $("formResetUserPassword").reset();
+          $("modalResetPassword").hidden = true;
+          if (successBox) successBox.hidden = true;
+        }, 1800);
       } catch (err) {
         toast(err.message, "error");
       } finally {
@@ -2512,7 +2550,11 @@ const state = {
           const avatarEl = $("teacherAvatar");
           if (avatarEl) {
             if (state.data.teacher.photo_base64) {
-              avatarEl.innerHTML = `<img src="${state.data.teacher.photo_base64}" alt="${escapeHTML(state.data.teacher.name)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;">`;
+              const img = document.createElement("img");
+              img.src = state.data.teacher.photo_base64;
+              img.alt = state.data.teacher.name || "Teacher Photo";
+              img.style.cssText = "width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;";
+              avatarEl.replaceChildren(img);
             } else {
               avatarEl.textContent = initials(state.data.teacher.name);
             }

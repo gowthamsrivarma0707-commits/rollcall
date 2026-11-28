@@ -434,6 +434,10 @@
             <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
             + Add faculty
           </button>
+          <button class="btn btn--outline btn--small" id="openResetPasswordModal" type="button" title="Reset forgotten password for student or faculty">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="4" y="9" width="12" height="8" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M7 9V6a3 3 0 116 0v3" stroke="currentColor" stroke-width="1.6"/></svg>
+            Reset Password
+          </button>
           <button class="btn btn--dark btn--small" id="openImportModal" type="button">
             <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 13v3a1 1 0 001 1h10a1 1 0 001-1v-3M10 3v10m-3-3l3 3 3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
             Upload Excel / CSV
@@ -807,6 +811,41 @@
           <div class="modal-foot" style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border-subtle, #e5e5e5); display:flex; justify-content:flex-end; gap:10px;">
             <button class="btn btn--ghost" type="button" data-close-modal>Cancel</button>
             <button class="btn btn--lime" id="btnSaveProfile" type="submit" style="font-weight:700;">Save Profile Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <!-- MODAL: RESET USER PASSWORD -->
+    <div class="modal-backdrop" id="modalResetPassword" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalResetPasswordTitle">
+        <div class="modal-head">
+          <h3 id="modalResetPasswordTitle">Reset User Password</h3>
+          <button class="modal-close" type="button" data-close-modal aria-label="Close modal">✕</button>
+        </div>
+        <form id="formResetUserPassword" class="modal-body">
+          <p class="field-hint" style="margin-top:0;">
+            Use this when a student or teacher forgot their custom password. This resets their account to default (<code>student123</code> / <code>teacher123</code>) so they can set a new password on first login.
+          </p>
+          <div class="form-field">
+            <label for="resetUserRole">Account Type</label>
+            <select id="resetUserRole" required>
+              <option value="student">Student</option>
+              <option value="teacher">Teacher / Faculty</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="resetUserIdentifier">Register No or Employee ID *</label>
+            <input id="resetUserIdentifier" type="text" placeholder="e.g. 26PSMCA0001 or EMP-01" required>
+          </div>
+          <div class="form-field">
+            <label for="resetCustomPassword">New Temporary Password (Optional)</label>
+            <input id="resetCustomPassword" type="text" placeholder="Leave blank for default (student123 / teacher123)">
+            <small class="field-hint">User will be prompted to set their own password immediately upon login.</small>
+          </div>
+          <div id="resetUserSuccessBox" class="alert alert--success" hidden style="margin-top:10px; padding:10px; font-size:13px; border-radius:6px; background:#e6f4ea; color:#137333;"></div>
+          <div class="modal-foot">
+            <button class="btn btn--ghost" type="button" data-close-modal>Cancel</button>
+            <button class="btn btn--dark" id="btnSubmitResetPassword" type="submit">Reset Password</button>
           </div>
         </form>
       </div>
